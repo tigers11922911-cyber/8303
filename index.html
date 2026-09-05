@@ -532,6 +532,13 @@ footer a { color: var(--clay); text-decoration: underline; }
         <label for="setting-sheet-name">シート名（タブ名）</label>
         <input type="text" id="setting-sheet-name" value="spots" placeholder="spots">
       </div>
+      <div class="form-field small">
+        <label for="setting-sheet-gid">シートのgid（任意・推奨）</label>
+        <input type="text" id="setting-sheet-gid" placeholder="例: 123456789">
+      </div>
+    </div>
+    <div class="panel-desc" style="margin-top:-4px;">
+      ※「gid」を設定すると、シートに絞り込み（フィルタ）がかかっていても全件を確実に読み込めます。スプレッドシートで「spots」タブを開いた時のURL末尾にある「#gid=数字」の数字部分をコピーして入力してください（分からなければ空欄のままでOKです）。
     </div>
     <button class="panel-submit-btn blue" id="save-settings-btn">設定を保存して再読込</button>
   </div>
@@ -651,8 +658,15 @@ function savePendingItems() {
 
 let config = loadStoredConfig() || {
   spreadsheetId: "1qQTE6PEken9k0_PkKtezeB9uDdZ9gm1olcp5j67TeQs",
-  sheetName: "spots"
+  sheetName: "spots",
+  gid: "360224140"
 };
+if (config.gid === undefined) config.gid = "";
+// 既存端末にgid未設定のまま保存された設定が残っている場合、既定のspots gidを自動補完する
+if (!config.gid && config.spreadsheetId === "1qQTE6PEken9k0_PkKtezeB9uDdZ9gm1olcp5j67TeQs") {
+  config.gid = "360224140";
+  saveStoredConfig();
+}
 
 // スプレッドシート未接続・読込失敗時でも画面が真っ黒にならないベース登録データ
 const FALLBACK_SPOTS = [
@@ -1954,7 +1968,13 @@ function extractSheetId(input) {
   return input.trim();
 }
 
-function buildCSVUrl(id, sheetName) {
+function buildCSVUrl(id, sheetName, gid) {
+  // gidが分かっている場合はexport?format=csvを使う。
+  // この方式はシートに「フィルタ」がかかっていても全行をそのまま出力するため、
+  // gviz方式（シートのフィルタがかかっていると非表示行を除外してしまう）より確実。
+  if (gid !== undefined && gid !== null && String(gid).trim() !== '') {
+    return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${encodeURIComponent(String(gid).trim())}`;
+  }
   if (sheetName) {
     return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   }
@@ -2026,7 +2046,7 @@ async function loadData() {
   loadingEl.style.display = 'block';
   updateFooterLink();
 
-  const targetUrl = buildCSVUrl(config.spreadsheetId, config.sheetName);
+  const targetUrl = buildCSVUrl(config.spreadsheetId, config.sheetName, config.gid);
   showStatus(`Googleドライブの「${escapeHtml(config.sheetName)}」シートから読み込んでいます…`, 'loading');
 
   try {
@@ -2154,11 +2174,19 @@ function getFiltered() {
 }
 
 function gmapUrl(item) {
+  // 座標ではなく名称・住所を優先してGoogleマップに渡す。
+  // 住所（address）があれば店名＋住所が最も正確。なければ店名＋都道府県＋エリアで代用。
+  const nameQuery = item.address
+    ? [item.name, item.address].filter(Boolean).join(' ')
+    : [item.name, item.prefecture, item.area].filter(Boolean).join(' ');
+  if (nameQuery) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nameQuery);
+  }
+  // 名称の情報が全くない場合のみ、座標にフォールバックする。
   if (item.lat != null && item.lng != null && !isNaN(item.lat) && !isNaN(item.lng)) {
     return 'https://www.google.com/maps/search/?api=1&query=' + item.lat + ',' + item.lng;
   }
-  const fallback = [item.name, item.prefecture, item.area].filter(Boolean).join(' ');
-  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(fallback);
+  return 'https://www.google.com/maps/search/?api=1&query=';
 }
 
 function renderCards(items) {
@@ -2177,6 +2205,7 @@ function renderCards(items) {
     card.className = 'card';
     const metaParts = [];
     if (item.prefecture) metaParts.push('<span>📍 ' + escapeHtml(item.prefecture) + (item.area ? ' ' + escapeHtml(item.area) : '') + '</span>');
+    if (item.address) metaParts.push('<span>🏠 ' + escapeHtml(item.address) + '</span>');
     if (item.access) metaParts.push('<span>🚗 ' + escapeHtml(item.access) + '</span>');
     if (item.phone) metaParts.push('<span>☎ ' + escapeHtml(item.phone) + '</span>');
     if (item.price) metaParts.push('<span>💴 ' + escapeHtml(item.price) + '</span>');
@@ -2333,17 +2362,20 @@ document.getElementById('settings-toggle-btn').addEventListener('click', () => {
   settingsPanel.classList.toggle('active');
   document.getElementById('setting-sheet-id').value = config.spreadsheetId;
   document.getElementById('setting-sheet-name').value = config.sheetName;
+  document.getElementById('setting-sheet-gid').value = config.gid || '';
 });
 
 document.getElementById('save-settings-btn').addEventListener('click', () => {
   const rawId = document.getElementById('setting-sheet-id').value.trim();
   const rawName = document.getElementById('setting-sheet-name').value.trim();
+  const rawGid = document.getElementById('setting-sheet-gid').value.trim();
   if (!rawId) {
     showToast('スプレッドシートIDまたはURLを入力してください');
     return;
   }
   config.spreadsheetId = extractSheetId(rawId);
   config.sheetName = rawName || 'spots';
+  config.gid = rawGid;
   saveStoredConfig();
   settingsPanel.classList.remove('active');
   loadData();
@@ -2476,6 +2508,23 @@ function initApp() {
   rebuildAllSelects();
   applyFilters();
   loadData();
+  startAutoRefresh();
+}
+
+// 自動再読み込み：一定間隔ごと、およびアプリに戻ってきた時に自動でシートを再取得する
+const AUTO_REFRESH_INTERVAL_MS = 3 * 60 * 1000; // 3分ごと
+function startAutoRefresh() {
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadData();
+    }
+  }, AUTO_REFRESH_INTERVAL_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      loadData();
+    }
+  });
 }
 
 if (document.readyState === 'loading') {
