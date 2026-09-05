@@ -540,14 +540,23 @@ footer a { color: var(--clay); text-decoration: underline; }
     <div class="panel-desc" style="margin-top:-4px;">
       ※「gid」を設定すると、シートに絞り込み（フィルタ）がかかっていても全件を確実に読み込めます。スプレッドシートで「spots」タブを開いた時のURL末尾にある「#gid=数字」の数字部分をコピーして入力してください（分からなければ空欄のままでOKです）。
     </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label for="setting-appscript-url">書き込み用Apps Script URL（任意）</label>
+        <input type="text" id="setting-appscript-url" placeholder="https://script.google.com/macros/s/xxxx/exec">
+      </div>
+    </div>
+    <div class="panel-desc" style="margin-top:-4px;">
+      ※「お店を追加」パネルから直接「spots」シートに書き込めるようにするには、スプレッドシートにGoogle Apps Scriptの書き込み用Webアプリを設置し、そのURL（末尾が /exec）をここに設定してください。設置手順は README.md を参照してください。未設定の場合は従来どおり候補リストへの一時保存になります。
+    </div>
     <button class="panel-submit-btn blue" id="save-settings-btn">設定を保存して再読込</button>
   </div>
 
   <!-- 新規追加候補パネル（名称欄なし・URLベース） -->
   <div id="add-panel" class="info-panel">
-    <div class="panel-title">新しい場所を追加候補に登録</div>
-    <div class="panel-desc">
-      気になる場所のURLを入力して「候補に追加」を押すと、一時リストに保存されます。たまったら「候補をコピー」で取得し、AI等に送ることで「spots」シートへの自動登録にご活用いただけます。
+    <div class="panel-title">新しい場所を追加</div>
+    <div class="panel-desc" id="add-panel-desc">
+      気になる場所のURLとカテゴリを入力して「追加」を押すと、「spots」シートに直接書き込まれます（連携設定で書き込み用Apps Script URLを設定している場合）。未設定の場合は一時リストに保存されます。
     </div>
     <div class="form-row">
       <div class="form-field">
@@ -567,11 +576,17 @@ footer a { color: var(--clay); text-decoration: underline; }
     </div>
     <div class="form-row">
       <div class="form-field">
+        <label for="add-name">名称（任意・空欄の場合はURLから自動生成）</label>
+        <input type="text" id="add-name" placeholder="例: RVパークsmart 阿字ヶ浦温泉のぞみ">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
         <label for="add-note">メモ（任意）</label>
         <input type="text" id="add-note" placeholder="気になった点、おすすめ理由、訪問予定など">
       </div>
     </div>
-    <button class="panel-submit-btn" id="add-submit-btn">候補に追加</button>
+    <button class="panel-submit-btn" id="add-submit-btn">追加</button>
 
     <div class="pending-list">
       <h3>追加候補リスト（<span id="pending-count">0</span>件）</h3>
@@ -659,9 +674,11 @@ function savePendingItems() {
 let config = loadStoredConfig() || {
   spreadsheetId: "1qQTE6PEken9k0_PkKtezeB9uDdZ9gm1olcp5j67TeQs",
   sheetName: "spots",
-  gid: "360224140"
+  gid: "360224140",
+  appsScriptUrl: ""
 };
 if (config.gid === undefined) config.gid = "";
+if (config.appsScriptUrl === undefined) config.appsScriptUrl = "";
 // 既存端末にgid未設定のまま保存された設定が残っている場合、既定のspots gidを自動補完する
 if (!config.gid && config.spreadsheetId === "1qQTE6PEken9k0_PkKtezeB9uDdZ9gm1olcp5j67TeQs") {
   config.gid = "360224140";
@@ -2363,12 +2380,14 @@ document.getElementById('settings-toggle-btn').addEventListener('click', () => {
   document.getElementById('setting-sheet-id').value = config.spreadsheetId;
   document.getElementById('setting-sheet-name').value = config.sheetName;
   document.getElementById('setting-sheet-gid').value = config.gid || '';
+  document.getElementById('setting-appscript-url').value = config.appsScriptUrl || '';
 });
 
 document.getElementById('save-settings-btn').addEventListener('click', () => {
   const rawId = document.getElementById('setting-sheet-id').value.trim();
   const rawName = document.getElementById('setting-sheet-name').value.trim();
   const rawGid = document.getElementById('setting-sheet-gid').value.trim();
+  const rawAppsScriptUrl = document.getElementById('setting-appscript-url').value.trim();
   if (!rawId) {
     showToast('スプレッドシートIDまたはURLを入力してください');
     return;
@@ -2376,23 +2395,59 @@ document.getElementById('save-settings-btn').addEventListener('click', () => {
   config.spreadsheetId = extractSheetId(rawId);
   config.sheetName = rawName || 'spots';
   config.gid = rawGid;
+  config.appsScriptUrl = rawAppsScriptUrl;
   saveStoredConfig();
   settingsPanel.classList.remove('active');
+  updateAddPanelDesc();
   loadData();
 });
+
+function updateAddPanelDesc() {
+  const el = document.getElementById('add-panel-desc');
+  if (!el) return;
+  el.textContent = config.appsScriptUrl
+    ? '場所のURLとカテゴリを入力して「追加」を押すと、「spots」シートに直接書き込まれます。'
+    : '書き込み用Apps Script URLが未設定のため、追加すると一時候補リストに保存されます。「⚙ 連携設定」から設定すると、スプレッドシートへの直接書き込みができます。';
+}
+updateAddPanelDesc();
 
 document.getElementById('add-toggle-btn').addEventListener('click', () => {
   settingsPanel.classList.remove('active');
   addPanel.classList.toggle('active');
 });
 
-document.getElementById('add-submit-btn').addEventListener('click', () => {
+function guessNameFromUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return `(名称未設定) ${host}`;
+  } catch (e) {
+    return '(名称未設定)';
+  }
+}
+
+async function addSpotViaAppsScript(payload) {
+  const res = await fetch(config.appsScriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json().catch(() => null);
+  if (!data || data.ok !== true) {
+    throw new Error((data && data.error) || 'Apps Scriptからの応答が不正です');
+  }
+}
+
+document.getElementById('add-submit-btn').addEventListener('click', async () => {
   const urlEl = document.getElementById('add-url');
   const catEl = document.getElementById('add-category');
+  const nameEl = document.getElementById('add-name');
   const noteEl = document.getElementById('add-note');
+  const submitBtn = document.getElementById('add-submit-btn');
 
   const url = urlEl.value.trim();
   const category = catEl.value;
+  const name = nameEl.value.trim();
   const note = noteEl.value.trim();
 
   if (!url) {
@@ -2407,6 +2462,32 @@ document.getElementById('add-submit-btn').addEventListener('click', () => {
     return;
   }
 
+  if (config.appsScriptUrl) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '追加中...';
+    try {
+      await addSpotViaAppsScript({
+        name: name || guessNameFromUrl(url),
+        category,
+        url,
+        features: note
+      });
+      urlEl.value = '';
+      catEl.value = '';
+      nameEl.value = '';
+      noteEl.value = '';
+      showToast('「spots」シートに追加しました');
+      await loadData();
+      applyFilters();
+    } catch (err) {
+      showToast('シートへの書き込みに失敗しました: ' + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '追加';
+    }
+    return;
+  }
+
   pendingItems.unshift({ url, category, note, time: Date.now() });
   urlEl.value = '';
   catEl.value = '';
@@ -2415,7 +2496,7 @@ document.getElementById('add-submit-btn').addEventListener('click', () => {
   savePendingItems();
   renderPendingUI();
   applyFilters();
-  showToast('候補リストに追加しました');
+  showToast('候補リストに追加しました（連携設定でApps Script URLを設定すると直接シートに書き込めます）');
 });
 
 function renderPendingUI() {
