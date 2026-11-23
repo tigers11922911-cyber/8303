@@ -1,0 +1,3039 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>計画相談データ転記・反映アプリ</title>
+  <!-- PWA（ホーム画面に追加してアプリとして使う設定） -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="application-name" content="計画相談転記" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="計画相談転記" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ExcelJS (書式を保持したExcel読み書き用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <!-- PDF.js (ブラウザ内でのPDFテキスト・座標抽出用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f4efe4;
+      color: #1f2937;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    header { padding-top: env(safe-area-inset-top); }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #efe9dc;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #b6c8c5;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #0f766e;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- トースト通知コンテナ（下部中央・半透明ティール） -->
+  <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 max-w-sm w-full pointer-events-none px-4"></div>
+
+  <!-- 確認モーダル -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border-2 border-teal-400">
+      <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-2">確認</h3>
+      <p id="modal-message" class="text-sm text-slate-600 mb-6 whitespace-pre-line"></p>
+      <div class="flex justify-end gap-3">
+        <button id="modal-cancel" type="button" class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">キャンセル</button>
+        <button id="modal-ok" type="button" class="px-4 py-2 text-sm font-bold text-white bg-[#0f766e] hover:bg-[#0d625b] rounded-xl transition shadow-sm">実行する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI設定モーダル（APIキー） -->
+  <div id="ai-settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border-2 border-teal-400 space-y-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900">⚙ AI設定</h3>
+        <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+          AI判定には Google の Gemini APIキーが必要です。<br>
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="text-[#0f766e] font-bold underline">Google AI Studio</a> で無料で発行できます。
+        </p>
+      </div>
+      <div>
+        <label for="ai-api-key-input" class="block text-xs font-bold text-slate-700 mb-1.5">Gemini APIキー</label>
+        <div class="flex items-center gap-2">
+          <input type="password" id="ai-api-key-input" autocomplete="off" spellcheck="false" placeholder="AIza..." class="flex-1 min-w-0 rounded-xl border-2 border-teal-200 bg-white px-3 py-2 text-sm font-mono focus:border-[#0f766e] outline-none" />
+          <button type="button" onclick="toggleApiKeyVisibility()" class="px-3 py-2 text-xs font-bold text-slate-600 bg-stone-100 hover:bg-stone-200 rounded-xl">表示</button>
+        </div>
+      </div>
+      <div>
+        <label for="ai-model-input" class="block text-xs font-bold text-slate-700 mb-1.5">使用モデル</label>
+        <input type="text" id="ai-model-input" spellcheck="false" class="w-full rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm font-mono focus:border-[#0f766e] outline-none" />
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+        🔒 APIキーはこの端末のブラウザ内にだけ保存され、Googleへの通信以外には送信されません。共用パソコンでは使用後に「削除」してください。
+      </p>
+      <div class="flex flex-wrap justify-between gap-2">
+        <button type="button" onclick="deleteAiSettings()" class="px-4 py-2 text-sm font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition">削除</button>
+        <div class="flex gap-2">
+          <button type="button" onclick="closeAiSettings()" class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">閉じる</button>
+          <button type="button" onclick="saveAiSettings()" class="px-4 py-2 text-sm font-bold text-white bg-[#0f766e] hover:bg-[#0d625b] rounded-xl transition shadow-sm">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ヘッダー（深緑ティール × ゴールド下線） -->
+  <header class="bg-[#0f766e] text-white border-b-4 border-[#eab308] shadow-md sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 space-y-2.5">
+      <!-- タイトル行 -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="inline-flex items-center gap-1.5 bg-[#facc15] text-slate-900 font-bold text-sm sm:text-base px-3.5 py-1.5 rounded-xl shadow-sm">
+            <span>📋</span>
+            <span>計画相談データ転記</span>
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-teal-100 tracking-wide">AI自動入力＆反映アプリ</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btn-install-app" onclick="installApp()" class="hidden inline-flex items-center gap-1 text-xs font-bold text-slate-900 bg-[#facc15] hover:bg-[#eab308] px-3 py-1.5 rounded-xl transition shadow-sm">
+            📲 アプリをインストール
+          </button>
+          <button type="button" onclick="openAiSettings()" class="inline-flex items-center gap-1 text-xs font-bold text-teal-100 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-xl transition">
+            ⚙ AI設定<span id="ai-key-dot" class="ml-0.5 w-2 h-2 rounded-full bg-rose-400 inline-block"></span>
+          </button>
+          <button type="button" onclick="confirmResetAllWork()" class="inline-flex items-center gap-1 text-xs font-bold text-teal-100 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-xl transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            初期化
+          </button>
+        </div>
+      </div>
+
+      <!-- ファイル＆保存ステータス行 -->
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-teal-50">
+        <span class="inline-flex items-center gap-1.5 font-medium">
+          <span>📁</span>
+          <span id="header-file-label">基本データ読み込み中...</span>
+        </span>
+        <span id="header-sheet-badge" class="hidden inline-flex items-center px-2 py-0.5 rounded-md bg-white/15 border border-white/20 text-[11px] font-semibold text-white"></span>
+        <span id="autosave-status" class="inline-flex items-center gap-1 text-[11px] text-teal-100">
+          <span>☁️</span>
+          <span id="autosave-status-text">作業データ自動保護 ON</span>
+        </span>
+      </div>
+
+      <!-- クイック操作ボタン行（保存・読込） -->
+      <div class="flex flex-wrap items-center gap-2 pt-0.5">
+        <button type="button" onclick="manualSaveWorkspace()" class="px-4 py-1.5 bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-bold rounded-xl shadow-sm transition">
+          保存
+        </button>
+        <button type="button" onclick="manualLoadWorkspace()" class="px-4 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold rounded-xl shadow-sm transition">
+          読込
+        </button>
+        <span class="text-[11px] text-teal-100/90 ml-1 hidden sm:inline">※作業内容は自動で保護されます</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ステップナビゲーション（浮かぶ白いピル型タブバー） -->
+  <div class="max-w-5xl w-full mx-auto px-4 sm:px-6 pt-4">
+    <nav class="bg-white rounded-2xl p-1.5 shadow-sm border border-stone-200/80 grid grid-cols-2 sm:grid-cols-4 gap-1.5" aria-label="作業ステップ">
+      <button type="button" onclick="goToStep(1)" id="nav-step-1" class="step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition">
+        <div class="flex items-center gap-1.5">
+          <span class="step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0">1</span>
+          <span class="text-xs sm:text-sm font-bold truncate">Claudeデータ入力</span>
+        </div>
+        <div id="nav-status-1" class="step-sub text-[10px] mt-0.5 truncate max-w-full">未選択</div>
+      </button>
+      <button type="button" onclick="goToStep(2)" id="nav-step-2" class="step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition">
+        <div class="flex items-center gap-1.5">
+          <span class="step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0">2</span>
+          <span class="text-xs sm:text-sm font-bold truncate">情報入力</span>
+        </div>
+        <div id="nav-status-2" class="step-sub text-[10px] mt-0.5 truncate max-w-full">未読み込み</div>
+      </button>
+      <button type="button" onclick="goToStep(3)" id="nav-step-3" class="step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition">
+        <div class="flex items-center gap-1.5">
+          <span class="step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0">3</span>
+          <span class="text-xs sm:text-sm font-bold truncate">AI判定</span>
+        </div>
+        <div id="nav-status-3" class="step-sub text-[10px] mt-0.5 truncate max-w-full">未実行</div>
+      </button>
+      <button type="button" onclick="goToStep(4)" id="nav-step-4" class="step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition">
+        <div class="flex items-center gap-1.5">
+          <span class="step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0">4</span>
+          <span class="text-xs sm:text-sm font-bold truncate">出力</span>
+        </div>
+        <div id="nav-status-4" class="step-sub text-[10px] mt-0.5 truncate max-w-full">待機中</div>
+      </button>
+    </nav>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4">
+
+    <!-- ==================== STEP 1: Claudeデータ入力 ==================== -->
+    <section id="step-1" class="step-section space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border-2 border-teal-400/70 p-4 sm:p-6 space-y-5">
+        <!-- ステップ切替ヘッダーバー -->
+        <div class="flex items-center justify-between gap-2 bg-teal-50/70 rounded-2xl px-3 py-2.5 border border-teal-100">
+          <button type="button" disabled class="w-9 h-9 rounded-full bg-teal-200/60 text-teal-500 flex items-center justify-center shrink-0 cursor-not-allowed">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+          <div class="text-center">
+            <h2 class="text-base sm:text-lg font-bold text-[#0f524c]">1. Claudeデータ入力</h2>
+            <p class="text-[11px] text-slate-500">反映先のExcel（計画相談_まとめ入力__2.xlsx等）を読み込み</p>
+          </div>
+          <button type="button" onclick="goToStep(2)" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="次へ：情報入力">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+
+        <!-- 基本データステータス＆自動固定チェック -->
+        <div class="flex flex-wrap items-center justify-between gap-2.5 bg-amber-50/70 border border-amber-200 rounded-2xl p-3">
+          <div class="space-y-1">
+            <div class="inline-flex items-center gap-1.5 text-xs font-bold text-[#0f524c]">
+              <span>⭐</span>
+              <span id="base-template-badge-text">基本データ：計画相談_まとめ入力_.xlsx（標準セット）</span>
+            </div>
+            <label class="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900 cursor-pointer">
+              <input type="checkbox" id="auto-pin-base-excel" checked class="rounded text-[#0f766e] focus:ring-[#0f766e]" />
+              <span>読込時にこのExcel（全行・書式込み）を自動で基本データに固定する</span>
+            </label>
+          </div>
+          <button type="button" onclick="loadDefaultBaseExcel(false)" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold text-[#0f766e] bg-white hover:bg-teal-50 border border-teal-200 rounded-xl shadow-sm transition">
+            <span>📋</span>
+            基本データに戻す
+          </button>
+        </div>
+
+        <!-- ドロップゾーン -->
+        <div id="target-dropzone" class="border-2 border-dashed border-teal-300 hover:border-[#0f766e] bg-[#faf7f0] hover:bg-teal-50/40 rounded-2xl p-7 text-center transition cursor-pointer">
+          <input type="file" id="target-file-input" accept=".xlsx" class="hidden" />
+          <div class="w-12 h-12 rounded-2xl bg-white shadow-sm border border-teal-200 flex items-center justify-center mx-auto mb-3 text-[#0f766e]">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <p class="text-sm font-bold text-slate-700">ここに反映先の .xlsx ファイルをドラッグ＆ドロップ</p>
+          <p class="text-xs text-slate-500 mt-1">またはタップ・クリックして選択（333行などの大規模シートもそのまま基本固定できます）</p>
+        </div>
+
+        <!-- 読み込み後のシート設定 -->
+        <div id="target-config-area" class="hidden pt-5 border-t border-stone-200 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-teal-50/70 border border-teal-200 rounded-xl p-3.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-lg bg-[#0f766e] text-white flex items-center justify-center text-xs font-bold">XLS</span>
+              <div>
+                <div id="target-filename" class="text-sm font-bold text-slate-900"></div>
+                <div id="target-filemeta" class="text-xs text-slate-600"></div>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="saveCurrentAsDefaultBaseExcel()" class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-bold rounded-xl shadow-sm transition">
+                <span>⭐</span>
+                このExcelを基本データに固定
+              </button>
+              <button type="button" onclick="document.getElementById('target-file-input').click()" class="px-3 py-1.5 bg-white hover:bg-teal-50 border border-teal-300 text-xs font-bold text-[#0f766e] rounded-xl transition">
+                別ファイルを読み込む
+              </button>
+            </div>
+          </div>
+
+          <!-- シート・形式選択 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">書き込み対象のシート</label>
+              <select id="target-sheet-select" onchange="onTargetSheetChange()" class="w-full rounded-xl border-2 border-teal-200 bg-white px-3 py-2 text-sm font-semibold focus:border-[#0f766e] outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">シートの形式（自動判定）</label>
+              <select id="sheet-layout-mode" onchange="onSheetLayoutModeChange()" class="w-full rounded-xl border-2 border-teal-300 bg-teal-50/40 px-3 py-2 text-sm font-bold text-[#0f524c] focus:border-[#0f766e] outline-none">
+                <option value="vertical">縦型フォーム（項目名・入力内容・書き方）</option>
+                <option value="horizontal">横型一覧表（1行＝1人分）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">見出し行番号</label>
+              <input type="number" id="target-header-row" value="1" min="1" max="100" onchange="parseTargetSheet()" class="w-full rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm font-semibold focus:border-[#0f766e] outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1.5">データ開始行</label>
+              <input type="number" id="target-data-start-row" value="2" min="1" max="100" onchange="parseTargetSheet()" class="w-full rounded-xl border-2 border-stone-200 bg-white px-3 py-2 text-sm font-semibold focus:border-[#0f766e] outline-none" />
+            </div>
+          </div>
+
+          <!-- 縦型フォームモード用の列指定パネル -->
+          <div id="vertical-col-config" class="bg-[#faf7f0] border-2 border-amber-200/80 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2 text-xs font-bold text-amber-950">
+              <span class="w-5 h-5 rounded-md bg-[#0f766e] text-white inline-flex items-center justify-center text-[11px]">✓</span>
+              <span>列の役割設定（AIが「項目名」と「書き方」を読んで「入力内容」に入れます）</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">項目名の列</label>
+                <select id="vcol-item-select" onchange="onVerticalColConfigChange()" class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold outline-none"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-[#0f766e] mb-1">入力内容の列（書き込み先・基本C列）</label>
+                <select id="vcol-value-select" onchange="onVerticalColConfigChange()" class="w-full rounded-xl border-2 border-[#0f766e] bg-white px-3 py-2 text-xs font-bold text-[#0f524c] outline-none"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">書き方・記入例の列（AI参考列）</label>
+                <select id="vcol-guide-select" onchange="onVerticalColConfigChange()" class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold outline-none"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 反映先プレビュー -->
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-xs font-bold text-slate-700">選択中シートのプレビュー</h3>
+                <span id="target-col-count" class="text-xs font-semibold text-[#0f766e]"></span>
+                <button type="button" id="btn-toggle-all-rows" onclick="toggleTargetPreviewAllRows()" class="px-2.5 py-1 text-[11px] font-bold text-[#0f766e] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition">
+                  全行を表示する
+                </button>
+              </div>
+              <!-- 列データクリア操作（基本：C列） -->
+              <div class="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-1.5">
+                <span class="text-[11px] font-bold text-rose-800">既存クリア：</span>
+                <select id="clear-col-select" class="rounded-lg border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 outline-none"></select>
+                <button type="button" onclick="confirmClearTargetColumn()" class="inline-flex items-center gap-1 px-3 py-1 bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-bold rounded-lg transition shadow-sm">
+                  クリア
+                </button>
+                <button type="button" id="btn-undo-clear" onclick="undoClearedColumns()" class="hidden text-[11px] font-bold text-slate-600 hover:text-slate-900 underline ml-1">
+                  元に戻す
+                </button>
+              </div>
+            </div>
+            <div id="cleared-columns-badge-area" class="hidden mb-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5"></div>
+            <div class="overflow-x-auto border border-stone-200 rounded-xl custom-scrollbar max-h-80">
+              <table id="target-preview-table" class="min-w-full divide-y divide-stone-200 text-xs"></table>
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="button" onclick="goToStep(2)" class="inline-flex items-center gap-2 px-7 py-3 bg-[#0f766e] hover:bg-[#0d625b] text-white text-sm font-bold rounded-xl shadow-sm transition">
+              次へ：情報入力
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== STEP 2: 情報入力 ==================== -->
+    <section id="step-2" class="step-section hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border-2 border-teal-400/70 p-4 sm:p-6 space-y-5">
+        <!-- ステップ切替ヘッダーバー -->
+        <div class="flex items-center justify-between gap-2 bg-teal-50/70 rounded-2xl px-3 py-2.5 border border-teal-100">
+          <button type="button" onclick="goToStep(1)" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="戻る：Claudeデータ入力">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+          <div class="text-center">
+            <h2 class="text-base sm:text-lg font-bold text-[#0f524c]">2. 情報入力</h2>
+            <p class="text-[11px] text-slate-500">Excel・CSV・PDF・コピー＆ペーストから元データを取り込み</p>
+          </div>
+          <button type="button" onclick="goToStep(3)" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="次へ：AI判定">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+
+        <!-- 取り込み方法タブ切替 -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <button type="button" id="tab-src-file" onclick="switchSourceTab('file')" class="src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-[#0f766e] text-white shadow-sm">
+              ファイルから読み込む
+            </button>
+            <button type="button" id="tab-src-paste" onclick="switchSourceTab('paste')" class="src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-stone-100 text-slate-600 hover:bg-stone-200">
+              コピー＆ペースト
+            </button>
+          </div>
+          <button type="button" onclick="loadSampleSourceData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#0f766e] bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition">
+            <span>⚡</span>
+            サンプル元データで試す
+          </button>
+        </div>
+
+        <!-- タブ1: ファイル読み込み -->
+        <div id="panel-src-file" class="space-y-4">
+          <div class="flex flex-wrap items-center gap-4 text-xs bg-[#faf7f0] border border-stone-200 rounded-xl px-3.5 py-2.5">
+            <label class="flex items-center gap-2">
+              <span class="font-bold text-slate-700">CSV文字コード：</span>
+              <select id="csv-encoding" class="rounded-lg border border-stone-300 px-2.5 py-1 bg-white text-slate-700 font-medium">
+                <option value="auto">自動判定（UTF-8 / Shift-JIS）</option>
+                <option value="shift-jis">Shift-JIS（福祉ソフト・行政系CSV）</option>
+                <option value="utf-8">UTF-8</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="source-has-header" checked class="rounded text-[#0f766e] focus:ring-[#0f766e]" />
+              <span class="text-slate-700 font-medium">1行目を項目名（見出し）として扱う</span>
+            </label>
+          </div>
+
+          <div id="source-dropzone" class="border-2 border-dashed border-teal-300 hover:border-[#0f766e] bg-[#faf7f0] hover:bg-teal-50/40 rounded-2xl p-8 text-center transition cursor-pointer">
+            <input type="file" id="source-file-input" accept=".xlsx,.csv,.tsv,.txt,.pdf" multiple class="hidden" />
+            <div class="w-12 h-12 rounded-2xl bg-white shadow-sm border border-teal-200 flex items-center justify-center mx-auto mb-3 text-[#0f766e]">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <p class="text-sm font-bold text-slate-700">ここに元データ（.xlsx / .csv / .tsv / .pdf）をドラッグ＆ドロップ</p>
+            <p class="text-xs text-slate-500 mt-1">またはタップして選択（PDFは複数ファイルの一括読み込みにも対応）</p>
+          </div>
+
+          <!-- Excelファイルの場合のシート選択 -->
+          <div id="source-excel-sheet-picker" class="hidden flex flex-wrap items-center gap-3 bg-[#faf7f0] p-3 rounded-xl border border-stone-200">
+            <span class="text-xs font-bold text-slate-700">読み込み元シート：</span>
+            <select id="source-sheet-select" onchange="onSourceExcelSheetChange()" class="rounded-lg border border-stone-300 px-3 py-1.5 text-xs bg-white font-semibold"></select>
+            <span class="text-xs font-bold text-slate-700 ml-2">見出し行：</span>
+            <input type="number" id="source-excel-header-row" value="1" min="1" max="50" onchange="onSourceExcelSheetChange()" class="w-16 rounded-lg border border-stone-300 px-2 py-1.5 text-xs bg-white font-semibold" />
+          </div>
+
+          <!-- PDFファイルの場合の抽出モード設定 -->
+          <div id="source-pdf-options" class="hidden bg-teal-50/70 border border-teal-200 rounded-xl p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#e11d48] text-white">PDF解析</span>
+                <label class="flex items-center gap-2 text-xs">
+                  <span class="font-bold text-slate-700">抽出モード：</span>
+                  <select id="pdf-extract-mode" onchange="onPdfModeChange()" class="rounded-lg border border-teal-300 px-2.5 py-1.5 bg-white text-slate-800 font-semibold">
+                    <option value="form">帳票・文章として抽出（計画書・アセスメントPDF向け）</option>
+                    <option value="table">表形式として抽出（一覧表・名簿PDF向け）</option>
+                  </select>
+                </label>
+              </div>
+              <button type="button" onclick="togglePdfRawEditor()" class="text-xs font-bold text-[#0f766e] hover:underline">
+                抽出テキストを確認・手動調整する
+              </button>
+            </div>
+            <div id="pdf-raw-editor-wrap" class="hidden space-y-2 pt-2 border-t border-teal-200/70">
+              <p class="text-[11px] text-slate-600">PDFから抽出したテキストを直接編集して再適用できます。</p>
+              <textarea id="pdf-raw-textarea" rows="6" class="w-full rounded-xl border border-teal-300 p-2.5 text-xs font-mono bg-white outline-none"></textarea>
+              <div class="flex justify-end">
+                <button type="button" onclick="applyEditedPdfText()" class="px-4 py-1.5 bg-[#0f766e] hover:bg-[#0d625b] text-white text-xs font-bold rounded-lg transition">
+                  修正テキストを再適用
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- タブ2: テキスト貼り付け -->
+        <div id="panel-src-paste" class="hidden space-y-3">
+          <p class="text-xs text-slate-600">Excel・スプレッドシートの表データや、アセスメント・相談記録の文章をそのまま下に貼り付けてください。</p>
+          <textarea id="paste-input" rows="7" placeholder="例：&#10;利用者氏名：山田 太郎（ヤマダ タロウ）&#10;生年月日：昭和60年4月12日&#10;受給者証番号：1000555111&#10;障害支援区分：区分3&#10;本人の希望：週3日ほどB型事業所で軽作業を続けたい。" class="w-full rounded-xl border-2 border-teal-200 p-3 text-xs font-mono focus:border-[#0f766e] outline-none bg-[#faf7f0]/50"></textarea>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <input type="checkbox" id="paste-has-header" checked class="rounded text-[#0f766e]" />
+              <span>表形式の場合、1行目を項目名として扱う</span>
+            </label>
+            <button type="button" onclick="parsePastedText()" class="px-5 py-2.5 bg-[#0f766e] hover:bg-[#0d625b] text-white text-xs font-bold rounded-xl shadow-sm transition">
+              貼り付けたデータを読み込む
+            </button>
+          </div>
+        </div>
+
+        <!-- 取り込み元データのプレビュー -->
+        <div id="source-preview-area" class="hidden pt-5 border-t border-stone-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-[#0f766e] text-white" id="source-count-badge">0件</span>
+              <h3 class="text-sm font-bold text-slate-800" id="source-name-label">読み込みデータ</h3>
+            </div>
+            <button type="button" onclick="clearSourceData()" class="px-3 py-1 bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-bold rounded-lg transition">クリア</button>
+          </div>
+          <div class="overflow-x-auto border border-stone-200 rounded-xl custom-scrollbar max-h-72">
+            <table id="source-preview-table" class="min-w-full divide-y divide-stone-200 text-xs"></table>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-3 pt-4 border-t border-stone-100">
+          <button type="button" onclick="goToStep(1)" class="px-5 py-3 text-sm font-bold text-slate-700 bg-white hover:bg-stone-50 border-2 border-stone-300 rounded-xl transition">戻る</button>
+          <button type="button" onclick="goToStep(3)" class="inline-flex items-center justify-center gap-2 px-7 py-3 bg-[#0f766e] hover:bg-[#0d625b] text-white text-sm font-bold rounded-xl shadow-sm transition">
+            次へ：AI判定
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== STEP 3: AI判定 ==================== -->
+    <section id="step-3" class="step-section hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border-2 border-teal-400/70 p-4 sm:p-6 space-y-5">
+        <!-- ステップ切替ヘッダーバー -->
+        <div class="flex items-center justify-between gap-2 bg-teal-50/70 rounded-2xl px-3 py-2.5 border border-teal-100">
+          <button type="button" onclick="goToStep(2)" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="戻る：情報入力">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+          <div class="text-center">
+            <h2 class="text-base sm:text-lg font-bold text-[#0f524c]">3. AI判定</h2>
+            <p id="step3-mode-desc" class="text-[11px] text-slate-500">「項目名」と「書き方」をもとにAIが入力内容を作成</p>
+          </div>
+          <button type="button" onclick="proceedFromStep3()" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="次へ：出力">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+
+        <!-- APIキー未設定時の案内 -->
+        <div id="ai-key-missing-banner" class="hidden flex flex-wrap items-center justify-between gap-2 bg-rose-50 border-2 border-rose-200 rounded-2xl p-3.5">
+          <p class="text-xs font-bold text-rose-800">⚠️ AI判定を使うには、先にGemini APIキーの設定が必要です。</p>
+          <button type="button" onclick="openAiSettings()" class="px-4 py-2 bg-[#0f766e] hover:bg-[#0d625b] text-white text-xs font-bold rounded-xl shadow-sm transition">⚙ AI設定を開く</button>
+        </div>
+
+        <!-- 縦型モード用オプション -->
+        <div id="vertical-options-box" class="bg-[#faf7f0] border-2 border-amber-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-bold">
+              <input type="checkbox" id="v-protect-existing" checked onchange="scheduleAutoSave()" class="rounded text-[#0f766e] focus:ring-[#0f766e]" />
+              <span>🔒 すでに入力内容が入っているセルは上書きせず保護する</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-bold">
+              <input type="checkbox" id="v-protect-formula" checked onchange="scheduleAutoSave()" class="rounded text-[#0f766e] focus:ring-[#0f766e]" />
+              <span>🔒 Excelの数式（計算式）が入っているセルは絶対に上書きしない</span>
+            </label>
+          </div>
+          <div id="vertical-target-summary" class="text-xs font-bold text-[#0f524c] bg-teal-50 border border-teal-300 px-3.5 py-2 rounded-xl shrink-0">
+            対象項目確認中
+          </div>
+        </div>
+
+        <!-- 横型モード用オプション -->
+        <div id="horizontal-options-box" class="hidden bg-[#faf7f0] border-2 border-amber-200/80 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">既存シートへの書き込み方法</label>
+            <select id="write-mode" onchange="onWriteModeChange()" class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold outline-none">
+              <option value="append">既存データの末尾に追記する（おすすめ）</option>
+              <option value="upsert">キー項目が一致すれば上書き、なければ末尾に追記</option>
+              <option value="overwrite">データ開始行からすべて上書きする</option>
+            </select>
+          </div>
+          <div id="upsert-key-container" class="hidden">
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">一致判定に使うキー列</label>
+            <select id="upsert-key-col" class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-xs font-semibold outline-none"></select>
+          </div>
+          <div class="flex flex-col justify-center gap-2">
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-medium">
+              <input type="checkbox" id="inherit-row-style" checked class="rounded text-[#0f766e]" />
+              <span>追記行に上の行の書式を引き継ぐ</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer font-medium">
+              <input type="checkbox" id="skip-empty-overwrite" checked class="rounded text-[#0f766e]" />
+              <span>空欄セルは既存の値を消さない</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- AI自動判断・実行カード -->
+        <div class="bg-teal-50/50 border-2 border-teal-200 rounded-2xl p-4 sm:p-5 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-[#0f524c] flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg bg-[#0f766e] text-white inline-flex items-center justify-center text-xs">AI</span>
+                AIにおまかせで解析・入力内容を作成
+              </h3>
+              <p class="text-xs text-slate-600 mt-1">
+                シートの「書き方（日付形式・和暦/西暦・文体など）」を読み取り、元データから該当情報を抽出・整形して入力欄へ入れます。
+              </p>
+            </div>
+            <div id="ai-source-summary" class="text-xs font-bold text-[#0f766e] bg-white border border-teal-200 px-3 py-1.5 rounded-xl shrink-0">
+              対象データ確認中
+            </div>
+          </div>
+
+          <div>
+            <label for="ai-custom-instruction" class="block text-xs font-bold text-slate-700 mb-1.5">AIへの追加指示（任意）</label>
+            <textarea id="ai-custom-instruction" rows="2" onchange="scheduleAutoSave()"
+              placeholder="例：日付はすべて「令和○年○月○日」形式にして。支援方針はです・ます調で簡潔にまとめて。"
+              class="w-full rounded-xl border-2 border-teal-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#0f766e] outline-none"></textarea>
+          </div>
+
+          <div class="pt-1">
+            <button type="button" id="btn-run-ai" onclick="runAiDataIntegration(false)"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#0f766e] hover:bg-[#0d625b] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl shadow-md transition">
+              <span>✨</span>
+              <span id="ai-btn-text">AIで項目名と書き方から入力内容を作成</span>
+            </button>
+          </div>
+
+          <!-- AI進捗バー -->
+          <div id="ai-progress-area" class="hidden pt-2 space-y-2">
+            <div class="flex items-center justify-between text-xs font-bold text-[#0f524c]">
+              <span id="ai-progress-label">AIが項目名・書き方と元データを解析しています...</span>
+              <span id="ai-progress-percent">0%</span>
+            </div>
+            <div class="w-full bg-teal-100 rounded-full h-3 overflow-hidden">
+              <div id="ai-progress-bar" class="bg-[#0f766e] h-3 rounded-full transition-all duration-300" style="width: 10%"></div>
+            </div>
+          </div>
+
+          <!-- AI判断結果サマリー -->
+          <div id="ai-result-box" class="hidden bg-white border-2 border-teal-400 rounded-2xl p-4 space-y-3 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-[#0f766e] font-bold text-xs">
+                <span>✅</span>
+                <span>AIによる入力内容の作成が完了しました（自動保存済み）</span>
+              </div>
+              <button type="button" onclick="goToStep(4)" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0f766e] hover:bg-[#0d625b] text-white text-xs font-bold rounded-xl shadow-sm transition">
+                出力へ進む
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+            <div class="text-xs text-slate-700 bg-[#faf7f0] border border-stone-200 rounded-xl p-3 whitespace-pre-line leading-relaxed" id="ai-reasoning-text"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-3 pt-2 border-t border-stone-100">
+          <button type="button" onclick="goToStep(2)" class="px-5 py-3 text-sm font-bold text-slate-700 bg-white hover:bg-stone-50 border-2 border-stone-300 rounded-xl transition">戻る</button>
+          <button type="button" onclick="proceedFromStep3()" class="inline-flex items-center justify-center gap-2 px-7 py-3 bg-[#0f766e] hover:bg-[#0d625b] text-white text-sm font-bold rounded-xl shadow-sm transition">
+            次へ：出力
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== STEP 4: 出力 ==================== -->
+    <section id="step-4" class="step-section hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border-2 border-teal-400/70 p-4 sm:p-6 space-y-5">
+        <!-- ステップ切替ヘッダーバー -->
+        <div class="flex items-center justify-between gap-2 bg-teal-50/70 rounded-2xl px-3 py-2.5 border border-teal-100">
+          <button type="button" onclick="goToStep(3)" class="w-9 h-9 rounded-full bg-[#0f766e] hover:bg-[#0d625b] text-white flex items-center justify-center shrink-0 shadow-sm transition" title="戻る：AI判定">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+          <div class="text-center">
+            <h2 class="text-base sm:text-lg font-bold text-[#0f524c]">4. 出力</h2>
+            <p class="text-[11px] text-slate-500">内容を確認・直接修正してExcelをダウンロード</p>
+          </div>
+          <button type="button" disabled class="w-9 h-9 rounded-full bg-teal-200/60 text-teal-500 flex items-center justify-center shrink-0 cursor-not-allowed">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+
+        <!-- 3色サマリーカード -->
+        <div class="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <div class="bg-[#eef8f6] border-2 border-teal-300/70 rounded-2xl p-3 text-center">
+            <div class="flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold text-[#0f524c]">
+              <span class="w-4 h-4 rounded bg-[#0f766e] text-white inline-flex items-center justify-center text-[10px]">1</span>
+              <span id="summary-card2-label" class="truncate">AI入力</span>
+            </div>
+            <div id="summary-add-count" class="text-base sm:text-lg font-extrabold text-[#0f524c] mt-1">0項目</div>
+          </div>
+          <div class="bg-[#f7f1e3] border-2 border-[#d6c29f] rounded-2xl p-3 text-center">
+            <div class="flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold text-[#6b4c23]">
+              <span class="w-4 h-4 rounded bg-[#855f2c] text-white inline-flex items-center justify-center text-[10px]">2</span>
+              <span id="summary-card3-label" class="truncate">既存保護</span>
+            </div>
+            <div id="summary-update-count" class="text-base sm:text-lg font-extrabold text-[#6b4c23] mt-1">0項目</div>
+          </div>
+          <div class="bg-[#fdf0f3] border-2 border-[#f3b6c4] rounded-2xl p-3 text-center">
+            <div class="flex items-center justify-center gap-1 text-[11px] sm:text-xs font-bold text-[#9f1239]">
+              <span class="w-4 h-4 rounded bg-[#e11d48] text-white inline-flex items-center justify-center text-[10px]">3</span>
+              <span id="summary-card4-label" class="truncate">対象シート</span>
+            </div>
+            <div id="summary-sheet-name" class="text-xs sm:text-sm font-extrabold text-[#9f1239] mt-1.5 truncate">-</div>
+            <div id="summary-mapped-cols" class="hidden"></div>
+          </div>
+        </div>
+
+        <!-- 保存ファイル名設定 -->
+        <div class="bg-[#faf7f0] border border-stone-200 rounded-2xl p-3.5">
+          <label for="export-filename-input" class="block text-xs font-bold text-slate-700 mb-1.5">保存するファイル名（変更可能）</label>
+          <div class="flex items-center">
+            <input type="text" id="export-filename-input" oninput="scheduleAutoSave()" placeholder="例：計画相談_まとめ入力_反映済"
+              class="w-full rounded-l-xl border-2 border-teal-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 focus:border-[#0f766e] outline-none" />
+            <span class="px-3 py-2 bg-stone-200 border-2 border-l-0 border-stone-300 rounded-r-xl text-sm font-mono font-bold text-slate-600">.xlsx</span>
+          </div>
+        </div>
+
+        <!-- 3連アクションボタン -->
+        <div class="grid grid-cols-3 gap-2.5">
+          <button type="button" onclick="exportUpdatedExcel()" id="btn-export-excel" class="py-3 px-2 bg-[#0f766e] hover:bg-[#0d625b] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition">
+            Excel出力
+          </button>
+          <button type="button" onclick="confirmClearPreviewColumnC()" class="py-3 px-2 bg-[#e11d48] hover:bg-[#be123c] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition">
+            C列クリア
+          </button>
+          <button type="button" onclick="manualSaveWorkspace()" class="py-3 px-2 bg-white hover:bg-stone-50 text-slate-700 border-2 border-stone-300 text-xs sm:text-sm font-bold rounded-xl transition">
+            🔒 一時保存
+          </button>
+        </div>
+
+        <!-- 凡例 -->
+        <div class="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-teal-100 border border-teal-400 inline-block"></span> AI自動入力 / 新規追加</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-400 inline-block"></span> 既存保護 / 上書き更新</span>
+          <span class="text-slate-400">※入力内容セルはタップして直接修正できます</span>
+        </div>
+
+        <!-- 反映結果プレビューテーブル -->
+        <div class="overflow-x-auto border-2 border-teal-200 rounded-2xl custom-scrollbar max-h-[520px]">
+          <table id="final-preview-table" class="min-w-full divide-y divide-stone-200 text-xs"></table>
+        </div>
+
+        <div class="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-3 pt-2">
+          <button type="button" onclick="goToStep(3)" class="px-5 py-3 text-sm font-bold text-slate-700 bg-white hover:bg-stone-50 border-2 border-stone-300 rounded-xl transition">戻る</button>
+          <button type="button" onclick="exportUpdatedExcel()" class="inline-flex items-center justify-center gap-2 px-7 py-3 bg-[#0f766e] hover:bg-[#0d625b] text-white text-sm font-bold rounded-xl shadow-sm transition">
+            Excelをダウンロード
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="py-5 mt-4">
+    <div class="max-w-5xl mx-auto px-4 text-center text-xs text-stone-500">
+      計画相談データ転記・反映アプリ — 項目名と書き方をAIが読み取って入力内容欄へ反映
+    </div>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // 初期設定（PDF.jsワーカー）
+    // =========================================================================
+    try {
+      if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    } catch (e) {
+      console.warn('PDF.js init warning:', e);
+    }
+
+    // =========================================================================
+    // AI設定（Gemini APIキー・モデル）— 端末のlocalStorageにのみ保存
+    // =========================================================================
+    const AI_KEY_STORAGE = 'keikaku_gemini_api_key';
+    const AI_MODEL_STORAGE = 'keikaku_gemini_model';
+    const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
+
+    function readStorage(key) {
+      try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+    }
+    function writeStorage(key, value) {
+      try {
+        if (value) localStorage.setItem(key, value);
+        else localStorage.removeItem(key);
+        return true;
+      } catch (e) { return false; }
+    }
+    function getApiKey() { return readStorage(AI_KEY_STORAGE).trim(); }
+    function getAiModel() { return readStorage(AI_MODEL_STORAGE).trim() || DEFAULT_GEMINI_MODEL; }
+
+    function updateAiKeyIndicator() {
+      const hasKey = getApiKey() !== '';
+      const dot = document.getElementById('ai-key-dot');
+      if (dot) dot.className = `ml-0.5 w-2 h-2 rounded-full inline-block ${hasKey ? 'bg-emerald-300' : 'bg-rose-400'}`;
+      const banner = document.getElementById('ai-key-missing-banner');
+      if (banner) banner.classList.toggle('hidden', hasKey);
+    }
+
+    function openAiSettings() {
+      document.getElementById('ai-api-key-input').value = getApiKey();
+      document.getElementById('ai-api-key-input').type = 'password';
+      document.getElementById('ai-model-input').value = getAiModel();
+      const modal = document.getElementById('ai-settings-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    function closeAiSettings() {
+      const modal = document.getElementById('ai-settings-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    function toggleApiKeyVisibility() {
+      const input = document.getElementById('ai-api-key-input');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+    function saveAiSettings() {
+      const key = document.getElementById('ai-api-key-input').value.trim();
+      const model = document.getElementById('ai-model-input').value.trim();
+      const ok = writeStorage(AI_KEY_STORAGE, key) && writeStorage(AI_MODEL_STORAGE, model === DEFAULT_GEMINI_MODEL ? '' : model);
+      updateAiKeyIndicator();
+      closeAiSettings();
+      if (!ok) showToast('この端末ではAI設定を保存できませんでした（プライベートモード等）。', 'error');
+      else showToast(key ? 'AI設定を保存しました。' : 'APIキーが空のため、AI判定は使えません。', key ? 'success' : 'warning');
+    }
+    function deleteAiSettings() {
+      writeStorage(AI_KEY_STORAGE, '');
+      writeStorage(AI_MODEL_STORAGE, '');
+      document.getElementById('ai-api-key-input').value = '';
+      document.getElementById('ai-model-input').value = DEFAULT_GEMINI_MODEL;
+      updateAiKeyIndicator();
+      showToast('この端末からAPIキーを削除しました。', 'info');
+    }
+
+    // =========================================================================
+    // アプリのインストール（PWA）
+    // =========================================================================
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      document.getElementById('btn-install-app')?.classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      document.getElementById('btn-install-app')?.classList.add('hidden');
+      showToast('アプリをインストールしました！ホーム画面から起動できます。', 'success');
+    });
+    async function installApp() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice.catch(() => null);
+      deferredInstallPrompt = null;
+      document.getElementById('btn-install-app')?.classList.add('hidden');
+    }
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW登録失敗:', err));
+      });
+    }
+
+    // =========================================================================
+    // アプリケーション状態管理
+    // =========================================================================
+    const state = {
+      currentStep: 1,
+
+      // 反映先Excel情報
+      targetArrayBuffer: null,
+      targetWorkbook: null,
+      targetFileName: '',
+      targetSheetName: '',
+      layoutMode: 'vertical',
+      targetHeaderRow: 1,
+      targetDataStartRow: 2,
+      targetColumns: [],
+      targetLastDataRow: 1,
+      clearedColumns: [],
+      showAllTargetPreviewRows: false,
+
+      // 縦型フォームモード用の列設定＆抽出済み項目
+      verticalCols: {
+        itemCol: 2,
+        valueCol: 3,
+        guideCol: 4,
+      },
+      verticalItems: [],
+
+      // 取り込み元データ情報
+      sourceFileName: '',
+      sourceWorkbook: null,
+      sourceHeaders: [],
+      sourceRows: [],
+      sourceRawText: '',
+      pdfDocuments: [],
+
+      // AI結果・プレビュー操作
+      aiReasoning: '',
+      verticalPlan: [],
+      horizontalPlan: [],
+    };
+
+    // =========================================================================
+    // 途中データ消失防止（IndexedDBによる自動保存＆復元 + 基本データ固定）
+    // =========================================================================
+    const DB_NAME = 'KeikakuSoudanAppDB_v2';
+    const STORE_NAME = 'workspace';
+    const WORKSPACE_KEY = 'current_session';
+    const DEFAULT_TEMPLATE_KEY = 'default_base_excel';
+    let autoSaveTimer = null;
+
+    function openWorkspaceDB() {
+      return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+          reject(new Error('IndexedDB unavailable'));
+          return;
+        }
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function scheduleAutoSave() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        saveWorkspaceToDB();
+      }, 450);
+    }
+
+    async function saveWorkspaceToDB() {
+      try {
+        const db = await openWorkspaceDB();
+        const customInstruction = document.getElementById('ai-custom-instruction')?.value || '';
+        const exportFileName = document.getElementById('export-filename-input')?.value || '';
+        const protectExisting = document.getElementById('v-protect-existing')?.checked ?? true;
+        const protectFormula = document.getElementById('v-protect-formula')?.checked ?? true;
+
+        const snapshot = {
+          savedAt: Date.now(),
+          currentStep: state.currentStep,
+          targetArrayBuffer: state.targetArrayBuffer ? state.targetArrayBuffer.slice(0) : null,
+          targetFileName: state.targetFileName,
+          targetSheetName: state.targetSheetName,
+          layoutMode: state.layoutMode,
+          targetHeaderRow: state.targetHeaderRow,
+          targetDataStartRow: state.targetDataStartRow,
+          clearedColumns: state.clearedColumns,
+          verticalCols: state.verticalCols,
+          sourceFileName: state.sourceFileName,
+          sourceHeaders: state.sourceHeaders,
+          sourceRows: state.sourceRows,
+          sourceRawText: state.sourceRawText,
+          aiReasoning: state.aiReasoning,
+          verticalPlan: state.verticalPlan,
+          horizontalPlan: state.horizontalPlan,
+          ui: {
+            customInstruction,
+            exportFileName,
+            protectExisting,
+            protectFormula,
+          },
+        };
+
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(snapshot, WORKSPACE_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+
+        const statusText = document.getElementById('autosave-status-text');
+        if (statusText) {
+          const now = new Date();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const dd = String(now.getDate()).padStart(2, '0');
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mi = String(now.getMinutes()).padStart(2, '0');
+          statusText.textContent = `${mm}/${dd} ${hh}:${mi} に保存済み`;
+        }
+      } catch (err) {
+        console.warn('Auto-save skipped:', err);
+      }
+    }
+
+    async function manualSaveWorkspace() {
+      await saveWorkspaceToDB();
+      showToast('現在の作業データを保存しました', 'success');
+    }
+
+    async function manualLoadWorkspace() {
+      await restoreWorkspaceFromDB(true);
+    }
+
+    async function restoreWorkspaceFromDB(manualTrigger = false) {
+      try {
+        const db = await openWorkspaceDB();
+        const snapshot = await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const req = tx.objectStore(STORE_NAME).get(WORKSPACE_KEY);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => reject(req.error);
+        });
+
+        if (!snapshot || (!snapshot.targetArrayBuffer && (!snapshot.sourceRows || snapshot.sourceRows.length === 0))) {
+          if (manualTrigger) showToast('保存されているデータが見つかりませんでした', 'warning');
+          return false;
+        }
+
+        if (snapshot.ui) {
+          const ci = document.getElementById('ai-custom-instruction');
+          if (ci) ci.value = snapshot.ui.customInstruction || '';
+          const ef = document.getElementById('export-filename-input');
+          if (ef) ef.value = snapshot.ui.exportFileName || '';
+          const pe = document.getElementById('v-protect-existing');
+          if (pe) pe.checked = snapshot.ui.protectExisting !== false;
+          const pf = document.getElementById('v-protect-formula');
+          if (pf) pf.checked = snapshot.ui.protectFormula !== false;
+        }
+
+        if (snapshot.targetArrayBuffer) {
+          await loadTargetWorkbookFromBuffer(snapshot.targetArrayBuffer, snapshot.targetFileName || '復元Excel.xlsx', {
+            restoreSheetName: snapshot.targetSheetName,
+            restoreLayoutMode: snapshot.layoutMode,
+            restoreHeaderRow: snapshot.targetHeaderRow,
+            restoreDataStartRow: snapshot.targetDataStartRow,
+            restoreVerticalCols: snapshot.verticalCols,
+            restoreClearedColumns: snapshot.clearedColumns || [],
+            silent: true,
+          });
+        }
+
+        if (snapshot.sourceRows && snapshot.sourceRows.length > 0) {
+          state.sourceFileName = snapshot.sourceFileName || '';
+          state.sourceHeaders = snapshot.sourceHeaders || [];
+          state.sourceRows = snapshot.sourceRows || [];
+          state.sourceRawText = snapshot.sourceRawText || '';
+          renderSourcePreview();
+        }
+
+        state.aiReasoning = snapshot.aiReasoning || '';
+        state.verticalPlan = snapshot.verticalPlan || [];
+        state.horizontalPlan = snapshot.horizontalPlan || [];
+
+        if (state.aiReasoning) {
+          const reasonEl = document.getElementById('ai-reasoning-text');
+          const resBox = document.getElementById('ai-result-box');
+          if (reasonEl && resBox) {
+            reasonEl.textContent = state.aiReasoning;
+            resBox.classList.remove('hidden');
+          }
+        }
+
+        if (snapshot.currentStep && snapshot.currentStep >= 1 && snapshot.currentStep <= 4) {
+          state.currentStep = snapshot.currentStep;
+          if (state.currentStep === 3) refreshStep3UI();
+          if (state.currentStep === 4) renderStep4();
+        }
+
+        updateStepUI();
+        showToast('前に「保存」したデータを読み込みました', 'success');
+        return true;
+      } catch (err) {
+        console.warn('Restore skipped:', err);
+        return false;
+      }
+    }
+
+    async function saveCurrentAsDefaultBaseExcel(silent = false) {
+      if (!state.targetArrayBuffer) {
+        if (!silent) showToast('先にExcelファイルを読み込んでください。', 'warning');
+        return;
+      }
+      try {
+        const db = await openWorkspaceDB();
+        const ws = state.targetWorkbook ? state.targetWorkbook.getWorksheet(state.targetSheetName) : null;
+        const totalRows = ws ? ws.rowCount : 0;
+        const baseData = {
+          savedAt: Date.now(),
+          fileName: state.targetFileName || '計画相談_まとめ入力_.xlsx',
+          sheetName: state.targetSheetName,
+          totalRows,
+          layoutMode: state.layoutMode,
+          headerRow: state.targetHeaderRow,
+          dataStartRow: state.targetDataStartRow,
+          verticalCols: { ...state.verticalCols },
+          arrayBuffer: state.targetArrayBuffer.slice(0),
+        };
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(baseData, DEFAULT_TEMPLATE_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        updateBaseTemplateBadge(baseData.fileName, true, totalRows);
+        if (!silent) showToast(`「${baseData.fileName}」（全${totalRows}行）を基本データに固定しました！`, 'success');
+      } catch (err) {
+        console.error(err);
+        if (!silent) showToast('基本データの保存に失敗しました。', 'error');
+      }
+    }
+
+    function updateBaseTemplateBadge(fileName, isCustom, rowCount = 0) {
+      const textEl = document.getElementById('base-template-badge-text');
+      if (!textEl) return;
+      const rowSuffix = rowCount > 0 ? `・全${rowCount}行` : '';
+      textEl.textContent = isCustom
+        ? `基本データ固定済：${fileName}（${rowSuffix.replace(/^・/, '')}）`
+        : `基本データ：${fileName}（標準セット${rowSuffix}）`;
+    }
+
+    async function loadDefaultBaseExcel(silent = false) {
+      try {
+        let customBase = null;
+        try {
+          const db = await openWorkspaceDB();
+          customBase = await new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).get(DEFAULT_TEMPLATE_KEY);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) {
+          console.warn('Default template read skipped:', e);
+        }
+
+        if (customBase && customBase.arrayBuffer) {
+          await loadTargetWorkbookFromBuffer(customBase.arrayBuffer, customBase.fileName || '計画相談_まとめ入力_.xlsx', {
+            restoreSheetName: customBase.sheetName,
+            restoreLayoutMode: customBase.layoutMode,
+            restoreHeaderRow: customBase.headerRow,
+            restoreDataStartRow: customBase.dataStartRow,
+            restoreVerticalCols: customBase.verticalCols,
+            silent,
+          });
+          const ws = state.targetWorkbook ? state.targetWorkbook.getWorksheet(state.targetSheetName) : null;
+          updateBaseTemplateBadge(customBase.fileName || '計画相談_まとめ入力_.xlsx', true, ws ? ws.rowCount : (customBase.totalRows || 0));
+          if (!silent) showToast(`基本データ「${customBase.fileName}」をセットしました。`, 'success');
+        } else {
+          const buffer = await buildBuiltInBaseExcelBuffer();
+          await loadTargetWorkbookFromBuffer(buffer, '計画相談_まとめ入力_.xlsx', { silent });
+          updateBaseTemplateBadge('計画相談_まとめ入力_.xlsx', false, 21);
+          if (!silent) showToast('基本データ「計画相談_まとめ入力_.xlsx」をセットしました。', 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        if (!silent) showToast('基本データのセットに失敗しました。', 'error');
+      }
+    }
+
+    function confirmResetAllWork() {
+      showConfirmModal(
+        '作業データのリセット確認',
+        '現在入力中の元データ・AIの入力結果を消去して、基本データがセットされた初期状態に戻しますか？\n※固定した基本データ設定は保持されます。',
+        async () => {
+          try {
+            const db = await openWorkspaceDB();
+            await new Promise((resolve) => {
+              const tx = db.transaction(STORE_NAME, 'readwrite');
+              tx.objectStore(STORE_NAME).delete(WORKSPACE_KEY);
+              tx.oncomplete = resolve;
+              tx.onerror = resolve;
+            });
+          } catch (e) {
+            console.warn(e);
+          }
+          state.currentStep = 1;
+          state.targetArrayBuffer = null;
+          state.targetWorkbook = null;
+          state.targetFileName = '';
+          state.targetSheetName = '';
+          state.targetColumns = [];
+          state.clearedColumns = [];
+          state.verticalItems = [];
+          state.sourceFileName = '';
+          state.sourceWorkbook = null;
+          state.sourceHeaders = [];
+          state.sourceRows = [];
+          state.sourceRawText = '';
+          state.pdfDocuments = [];
+          state.aiReasoning = '';
+          state.verticalPlan = [];
+          state.horizontalPlan = [];
+
+          document.getElementById('source-preview-area').classList.add('hidden');
+          document.getElementById('source-excel-sheet-picker').classList.add('hidden');
+          document.getElementById('source-pdf-options').classList.add('hidden');
+          document.getElementById('ai-result-box').classList.add('hidden');
+          document.getElementById('ai-custom-instruction').value = '';
+          document.getElementById('export-filename-input').value = '';
+
+          await loadDefaultBaseExcel(true);
+          updateStepUI();
+          showToast('作業データをリセットし、基本データをセットしました。', 'info');
+        }
+      );
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+      if (state.targetWorkbook || state.sourceRows.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // =========================================================================
+    // 初期化・イベントリスナー登録
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        setupDropzone('target-dropzone', 'target-file-input', handleTargetFiles);
+        setupDropzone('source-dropzone', 'source-file-input', handleSourceFiles);
+        switchSourceTab('file');
+        updateAiKeyIndicator();
+        updateStepUI();
+        const restored = await restoreWorkspaceFromDB();
+        if (!restored || !state.targetWorkbook) {
+          await loadDefaultBaseExcel(true);
+        }
+      } catch (err) {
+        console.error('Init error:', err);
+      }
+    });
+
+    async function buildBuiltInBaseExcelBuffer() {
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('まとめ入力');
+
+      const headers = ['No', '項目名', '入力内容', '書き方・記入例'];
+      const headerRow = ws.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+
+      const baseRows = [
+        ['1', '計画作成日', '', '西暦 YYYY/MM/DD 形式（例：2026/11/23）'],
+        ['2', '計画種別', '', '「新規」「更新」「変更」のいずれかを記載'],
+        ['3', '受給者証番号', '', '半角数字10桁で入力（例：1000234567）'],
+        ['4', '利用者氏名', '', '姓と名の間に全角スペース（例：山田　太郎）'],
+        ['5', 'フリガナ', '', '全角カタカナ、姓と名の間にスペース（例：ヤマダ　タロウ）'],
+        ['6', '生年月日', '', '西暦 YYYY/MM/DD 形式（例：1985/04/12）'],
+        ['7', '住所', '', '都道府県から番地・建物名まで記載'],
+        ['8', '電話番号・連絡先', '', 'ハイフン区切り（例：090-1234-5678）'],
+        ['9', '障害種別・手帳等級', '', '手帳の種類と等級を記載（例：療育手帳B、精神障害者保健福祉手帳2級）'],
+        ['10', '障害支援区分', '', '「区分1」〜「区分6」または「非該当」で記載'],
+        ['11', '家族構成・緊急連絡先', '', '同居家族・キーパーソンと続柄を記載'],
+        ['12', '現在の生活状況', '', '日中活動や自宅での過ごし方を簡潔に記載（です・ます調）'],
+        ['13', '利用者・家族の意向', '', '本人の言葉を尊重し、希望や目標を1〜2文で記載'],
+        ['14', '総合的な援助方針', '', '支援の方向性・連携のポイントを2〜3文で記載'],
+        ['15', '長期目標', '', 'おおむね1年〜数年後に目指す状態を記載'],
+        ['16', '短期目標', '', '3〜6か月程度で達成を目指す具体的な目標を記載'],
+        ['17', '利用予定サービス・頻度', '', 'サービス名と利用日数を記載（例：就労継続支援B型 週3日）'],
+        ['18', '利用事業所名', '', '利用予定の事業所名を記載'],
+        ['19', 'モニタリング期間', '', '実施頻度を記載（例：毎月、3か月ごと、6か月ごと）'],
+        ['20', '相談支援事業所・担当者名', '', '事業所名と相談支援専門員の氏名を記載'],
+      ];
+      baseRows.forEach((r) => {
+        const added = ws.addRow(r);
+        added.eachCell((cell) => {
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+      });
+
+      ws.getColumn(1).width = 6;
+      ws.getColumn(2).width = 24;
+      ws.getColumn(3).width = 38;
+      ws.getColumn(4).width = 48;
+
+      return await wb.xlsx.writeBuffer();
+    }
+
+    function setupDropzone(zoneId, inputId, callback) {
+      const zone = document.getElementById(zoneId);
+      const input = document.getElementById(inputId);
+      if (!zone || !input) return;
+
+      zone.addEventListener('click', () => input.click());
+      input.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          callback(e.target.files);
+          e.target.value = '';
+        }
+      });
+
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('border-[#0f766e]', 'bg-teal-50/60');
+      });
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('border-[#0f766e]', 'bg-teal-50/60');
+      });
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('border-[#0f766e]', 'bg-teal-50/60');
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          callback(e.dataTransfer.files);
+        }
+      });
+    }
+
+    // =========================================================================
+    // 共通UIユーティリティ
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const styles = {
+        success: 'bg-[#0f766e]/95 text-white border-teal-400/50',
+        error: 'bg-[#e11d48]/95 text-white border-rose-300/50',
+        warning: 'bg-[#d97706]/95 text-white border-amber-300/50',
+        info: 'bg-[#0f766e]/90 text-white border-teal-300/40',
+      };
+      const icons = {
+        success: '✅',
+        error: '⚠️',
+        warning: '💡',
+        info: 'ℹ️',
+      };
+
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-lg border backdrop-blur-sm text-xs sm:text-sm font-bold text-center transition-all duration-300 flex items-center justify-center gap-2 ${styles[type] || styles.info}`;
+      el.textContent = `${icons[type] || '✅'} ${message}`;
+      container.appendChild(el);
+
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 3200);
+    }
+
+    function showConfirmModal(title, message, onConfirm) {
+      const modal = document.getElementById('confirm-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+
+      const btnOk = document.getElementById('modal-ok');
+      const btnCancel = document.getElementById('modal-cancel');
+
+      const close = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      };
+
+      btnCancel.onclick = close;
+      btnOk.onclick = () => {
+        close();
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getColLetter(colNum) {
+      let letter = '';
+      let n = colNum;
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        letter = String.fromCharCode(65 + rem) + letter;
+        n = Math.floor((n - 1) / 26);
+      }
+      return letter;
+    }
+
+    function isCellFormula(cell) {
+      if (!cell || !cell.value || typeof cell.value !== 'object') return false;
+      return Boolean(cell.value.formula || cell.value.sharedFormula);
+    }
+
+    function extractCellText(cell) {
+      if (!cell || cell.value === null || cell.value === undefined) return '';
+      const val = cell.value;
+      if (val instanceof Date) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}/${m}/${d}`;
+      }
+      if (typeof val === 'object') {
+        if (val.richText && Array.isArray(val.richText)) {
+          return val.richText.map(rt => rt.text || '').join('');
+        }
+        if (val.result !== undefined && val.result !== null) {
+          return String(val.result);
+        }
+        if (val.text !== undefined) {
+          return String(val.text);
+        }
+        return '';
+      }
+      return String(val);
+    }
+
+    // =========================================================================
+    // ステップ遷移管理
+    // =========================================================================
+    function goToStep(step) {
+      if (step >= 3 && !state.targetWorkbook) {
+        showToast('先にステップ1で反映先のExcelファイルを読み込んでください。', 'warning');
+        step = 1;
+      } else if (step >= 3 && state.sourceRows.length === 0 && !state.sourceRawText) {
+        showToast('先にステップ2で元データを取り込んでください。', 'warning');
+        step = 2;
+      } else if (step === 4) {
+        const hasPlan = state.layoutMode === 'vertical'
+          ? state.verticalPlan.length > 0
+          : state.horizontalPlan.length > 0;
+        if (!hasPlan) {
+          showToast('先にステップ3で「AIで項目名と書き方から入力内容を作成」を実行してください。', 'warning');
+          step = 3;
+        }
+      }
+
+      state.currentStep = step;
+      if (step === 3) refreshStep3UI();
+      if (step === 4) renderStep4();
+
+      updateStepUI();
+      scheduleAutoSave();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateStepUI() {
+      for (let i = 1; i <= 4; i++) {
+        const section = document.getElementById(`step-${i}`);
+        const nav = document.getElementById(`nav-step-${i}`);
+        const badge = nav ? nav.querySelector('.step-badge') : null;
+        const sub = nav ? nav.querySelector('.step-sub') : null;
+
+        if (section) section.classList.toggle('hidden', i !== state.currentStep);
+        if (nav && badge) {
+          if (i === state.currentStep) {
+            nav.className = 'step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition bg-[#0f766e] text-white shadow-sm';
+            badge.className = 'step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 bg-[#facc15] text-slate-900';
+            if (sub) sub.className = 'step-sub text-[10px] mt-0.5 truncate max-w-full text-teal-100';
+          } else {
+            nav.className = 'step-nav flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition bg-stone-100/90 hover:bg-stone-200/70 text-slate-700';
+            badge.className = 'step-badge w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 bg-stone-300 text-slate-700';
+            if (sub) sub.className = 'step-sub text-[10px] mt-0.5 truncate max-w-full text-slate-500';
+          }
+        }
+      }
+
+      const hFile = document.getElementById('header-file-label');
+      const hBadge = document.getElementById('header-sheet-badge');
+      if (hFile) {
+        hFile.textContent = state.targetFileName || 'ファイル未選択（ステップ1で読み込んでください）';
+      }
+      if (hBadge) {
+        if (state.targetSheetName) {
+          const ws = state.targetWorkbook ? state.targetWorkbook.getWorksheet(state.targetSheetName) : null;
+          const rowInfo = ws ? `全${ws.rowCount}行` : '';
+          hBadge.textContent = `${state.targetSheetName} ｜ ${rowInfo} ｜ ${state.layoutMode === 'vertical' ? '縦型' : '横型'}`;
+          hBadge.classList.remove('hidden');
+        } else {
+          hBadge.classList.add('hidden');
+        }
+      }
+
+      const st1 = document.getElementById('nav-status-1');
+      const st2 = document.getElementById('nav-status-2');
+      const st3 = document.getElementById('nav-status-3');
+      const st4 = document.getElementById('nav-status-4');
+
+      if (st1) {
+        if (!state.targetWorkbook) {
+          st1.textContent = '未選択';
+        } else if (state.layoutMode === 'vertical') {
+          st1.textContent = `${state.targetSheetName} (${state.verticalItems.length}項目)`;
+        } else {
+          st1.textContent = `${state.targetSheetName} (${state.targetColumns.length}列)`;
+        }
+      }
+      if (st2) {
+        st2.textContent = state.sourceRows.length > 0
+          ? `${state.sourceRows.length}件 読込済`
+          : (state.sourceRawText ? 'テキスト読込済' : '未読み込み');
+      }
+      const planCount = state.layoutMode === 'vertical' ? state.verticalPlan.length : state.horizontalPlan.length;
+      if (st3) st3.textContent = planCount > 0 ? `AI入力済 (${planCount}件)` : '未実行';
+      if (st4) st4.textContent = planCount > 0 ? '出力準備OK' : '待機中';
+    }
+
+    // =========================================================================
+    // STEP 1: 反映先Excelの読み込み・縦型/横型解析・C列クリア
+    // =========================================================================
+    async function handleTargetFiles(files) {
+      const file = files[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        showToast('反映先ファイルは .xlsx 形式のExcelファイルを選択してください。', 'error');
+        return;
+      }
+      try {
+        const buffer = await file.arrayBuffer();
+        await loadTargetWorkbookFromBuffer(buffer, file.name);
+        const autoPin = document.getElementById('auto-pin-base-excel')?.checked ?? true;
+        const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+        const totalRows = ws ? ws.rowCount : 0;
+        if (autoPin) {
+          await saveCurrentAsDefaultBaseExcel(true);
+          showToast(`「${file.name}」（全${totalRows}行）を読み込み、基本データに固定しました！`, 'success');
+        } else {
+          showToast(`「${file.name}」（全${totalRows}行）を読み込みました。`, 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Excelファイルの読み込みに失敗しました。パスワード保護されていない .xlsx かご確認ください。', 'error');
+      }
+    }
+
+    async function loadTargetWorkbookFromBuffer(buffer, fileName, options = {}) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer.slice(0));
+
+      state.targetArrayBuffer = buffer.slice(0);
+      state.targetWorkbook = wb;
+      state.targetFileName = fileName;
+      state.showAllTargetPreviewRows = false;
+      state.clearedColumns = options.restoreClearedColumns ? [...options.restoreClearedColumns] : [];
+      if (!options.silent) {
+        state.verticalPlan = [];
+        state.horizontalPlan = [];
+        state.aiReasoning = '';
+        document.getElementById('ai-result-box').classList.add('hidden');
+      }
+
+      document.getElementById('target-filename').textContent = fileName;
+      document.getElementById('target-config-area').classList.remove('hidden');
+
+      const sheetSelect = document.getElementById('target-sheet-select');
+      sheetSelect.innerHTML = '';
+      wb.worksheets.forEach((ws) => {
+        const opt = document.createElement('option');
+        opt.value = ws.name;
+        opt.textContent = `${ws.name}（${ws.rowCount}行）`;
+        sheetSelect.appendChild(opt);
+      });
+
+      const targetSheet = options.restoreSheetName && wb.getWorksheet(options.restoreSheetName)
+        ? options.restoreSheetName
+        : (wb.worksheets[0] ? wb.worksheets[0].name : '');
+
+      state.targetSheetName = targetSheet;
+      sheetSelect.value = targetSheet;
+
+      const ws = wb.getWorksheet(targetSheet);
+      if (ws) {
+        document.getElementById('target-filemeta').textContent = `シート数: ${wb.worksheets.length}件 ／ 選択シート総行数: ${ws.rowCount}行`;
+        if (options.restoreHeaderRow) {
+          document.getElementById('target-header-row').value = options.restoreHeaderRow;
+          document.getElementById('target-data-start-row').value = options.restoreDataStartRow || (options.restoreHeaderRow + 1);
+        } else {
+          detectHeaderRowAuto(ws);
+        }
+
+        if (state.clearedColumns.length > 0) {
+          const startRow = parseInt(document.getElementById('target-data-start-row').value, 10) || 2;
+          state.clearedColumns.forEach(colNum => {
+            for (let r = startRow; r <= ws.rowCount; r++) {
+              const cell = ws.getRow(r).getCell(colNum);
+              if (!isCellFormula(cell)) cell.value = null;
+            }
+          });
+        }
+
+        parseTargetSheet(options);
+      }
+
+      if (!options.silent) {
+        scheduleAutoSave();
+      }
+    }
+
+    function detectHeaderRowAuto(ws) {
+      let bestRow = 1;
+      let maxScore = -1;
+      const limit = Math.min(ws.rowCount || 10, 15);
+
+      for (let r = 1; r <= limit; r++) {
+        const row = ws.getRow(r);
+        let nonEmpty = 0;
+        let keywordHit = 0;
+        row.eachCell({ includeEmpty: false }, (cell) => {
+          const t = extractCellText(cell).trim();
+          if (t !== '') {
+            nonEmpty++;
+            if (/項目|入力|内容|書き方|記入例|説明|備考|氏名|受給者/.test(t)) {
+              keywordHit += 3;
+            }
+          }
+        });
+        const score = nonEmpty + keywordHit;
+        if (score > maxScore) {
+          maxScore = score;
+          bestRow = r;
+        }
+      }
+      document.getElementById('target-header-row').value = bestRow;
+      document.getElementById('target-data-start-row').value = bestRow + 1;
+    }
+
+    function onTargetSheetChange() {
+      state.targetSheetName = document.getElementById('target-sheet-select').value;
+      state.clearedColumns = [];
+      state.verticalPlan = [];
+      state.horizontalPlan = [];
+      state.showAllTargetPreviewRows = false;
+      const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+      if (ws) {
+        document.getElementById('target-filemeta').textContent = `シート数: ${state.targetWorkbook.worksheets.length}件 ／ 選択シート総行数: ${ws.rowCount}行`;
+        detectHeaderRowAuto(ws);
+        parseTargetSheet();
+      }
+      scheduleAutoSave();
+    }
+
+    function onSheetLayoutModeChange() {
+      state.layoutMode = document.getElementById('sheet-layout-mode').value;
+      document.getElementById('vertical-col-config').classList.toggle('hidden', state.layoutMode !== 'vertical');
+      parseTargetSheet({ keepLayoutMode: true });
+      scheduleAutoSave();
+    }
+
+    function onVerticalColConfigChange() {
+      state.verticalCols.itemCol = parseInt(document.getElementById('vcol-item-select').value, 10) || 2;
+      state.verticalCols.valueCol = parseInt(document.getElementById('vcol-value-select').value, 10) || 3;
+      state.verticalCols.guideCol = parseInt(document.getElementById('vcol-guide-select').value, 10) || 0;
+      extractVerticalItems();
+      const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+      renderTargetPreview(ws);
+      updateStepUI();
+      scheduleAutoSave();
+    }
+
+    function parseTargetSheet(options = {}) {
+      if (!state.targetWorkbook) return;
+      const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+      if (!ws) return;
+
+      const headerRowNum = Math.max(1, parseInt(document.getElementById('target-header-row').value, 10) || 1);
+      const dataStartRow = Math.max(1, parseInt(document.getElementById('target-data-start-row').value, 10) || (headerRowNum + 1));
+      state.targetHeaderRow = headerRowNum;
+      state.targetDataStartRow = dataStartRow;
+
+      const headerRow = ws.getRow(headerRowNum);
+      const maxCol = Math.max(ws.columnCount || 0, headerRow.cellCount || 0, 5);
+      const cols = [];
+
+      for (let c = 1; c <= maxCol; c++) {
+        const text = extractCellText(headerRow.getCell(c)).trim();
+        cols.push({
+          colNumber: c,
+          colLetter: getColLetter(c),
+          headerName: text || `${getColLetter(c)}列`,
+          hasExplicitHeader: text !== '',
+        });
+      }
+
+      let lastValidIdx = cols.length - 1;
+      while (lastValidIdx > 3 && !cols[lastValidIdx].hasExplicitHeader) {
+        lastValidIdx--;
+      }
+      state.targetColumns = cols.slice(0, lastValidIdx + 1);
+
+      let lastDataRow = dataStartRow - 1;
+      for (let r = dataStartRow; r <= ws.rowCount; r++) {
+        const row = ws.getRow(r);
+        let hasValue = false;
+        for (const col of state.targetColumns) {
+          if (extractCellText(row.getCell(col.colNumber)).trim() !== '') {
+            hasValue = true;
+            break;
+          }
+        }
+        if (hasValue) lastDataRow = r;
+      }
+      state.targetLastDataRow = lastDataRow;
+
+      if (options.restoreVerticalCols) {
+        state.verticalCols = { ...options.restoreVerticalCols };
+      } else {
+        autoDetectVerticalCols();
+      }
+
+      if (options.restoreLayoutMode) {
+        state.layoutMode = options.restoreLayoutMode;
+      } else if (!options.keepLayoutMode) {
+        const hasVerticalKeywords = state.targetColumns.some(c => /項目|入力内容|書き方|記入例/.test(c.headerName));
+        state.layoutMode = hasVerticalKeywords || state.targetColumns.length <= 7 ? 'vertical' : 'horizontal';
+      }
+
+      document.getElementById('sheet-layout-mode').value = state.layoutMode;
+      document.getElementById('vertical-col-config').classList.toggle('hidden', state.layoutMode !== 'vertical');
+
+      populateVerticalColSelects();
+      extractVerticalItems();
+      updateClearColumnSelect();
+      updateClearedColumnsUI();
+      renderTargetPreview(ws);
+      updateStepUI();
+    }
+
+    function autoDetectVerticalCols() {
+      const cols = state.targetColumns;
+      let itemCol = 0;
+      let valueCol = 0;
+      let guideCol = 0;
+
+      cols.forEach(c => {
+        const h = c.headerName;
+        if (!itemCol && /項目|設問|タイトル|ラベル|名称/.test(h)) itemCol = c.colNumber;
+        if (!valueCol && /入力|内容|回答|記入欄|値/.test(h)) valueCol = c.colNumber;
+        if (!guideCol && /書き方|記入例|例|説明|メモ|ガイド|注意|ポイント|備考/.test(h)) guideCol = c.colNumber;
+      });
+
+      if (!valueCol) valueCol = Math.min(3, cols.length);
+      if (!itemCol) itemCol = valueCol >= 2 ? valueCol - 1 : 1;
+      if (!guideCol) {
+        const nextCol = cols.find(c => c.colNumber > valueCol);
+        guideCol = nextCol ? nextCol.colNumber : 0;
+      }
+
+      state.verticalCols = { itemCol, valueCol, guideCol };
+    }
+
+    function populateVerticalColSelects() {
+      const itemSel = document.getElementById('vcol-item-select');
+      const valSel = document.getElementById('vcol-value-select');
+      const guideSel = document.getElementById('vcol-guide-select');
+      if (!itemSel || !valSel || !guideSel) return;
+
+      const makeOpts = (includeNone) => {
+        let html = includeNone ? '<option value="0">-- なし（書き方列を使わない） --</option>' : '';
+        state.targetColumns.forEach(c => {
+          html += `<option value="${c.colNumber}">${c.colLetter}列：${escapeHtml(c.headerName)}</option>`;
+        });
+        return html;
+      };
+
+      itemSel.innerHTML = makeOpts(false);
+      valSel.innerHTML = makeOpts(false);
+      guideSel.innerHTML = makeOpts(true);
+
+      itemSel.value = String(state.verticalCols.itemCol);
+      valSel.value = String(state.verticalCols.valueCol);
+      guideSel.value = String(state.verticalCols.guideCol);
+    }
+
+    function extractVerticalItems() {
+      const ws = state.targetWorkbook ? state.targetWorkbook.getWorksheet(state.targetSheetName) : null;
+      if (!ws) {
+        state.verticalItems = [];
+        return;
+      }
+      const { itemCol, valueCol, guideCol } = state.verticalCols;
+      const items = [];
+
+      for (let r = state.targetDataStartRow; r <= Math.max(ws.rowCount, state.targetLastDataRow); r++) {
+        const row = ws.getRow(r);
+        const itemName = extractCellText(row.getCell(itemCol)).trim();
+        const guideText = guideCol > 0 ? extractCellText(row.getCell(guideCol)).trim() : '';
+        const valCell = row.getCell(valueCol);
+        const isFormula = isCellFormula(valCell);
+        const existingValue = state.clearedColumns.includes(valueCol) ? '' : extractCellText(valCell).trim();
+
+        if (itemName !== '') {
+          items.push({
+            rowNumber: r,
+            itemName,
+            guideText,
+            existingValue,
+            isFormula,
+          });
+        }
+      }
+      state.verticalItems = items;
+
+      const countEl = document.getElementById('target-col-count');
+      if (countEl) {
+        countEl.textContent = state.layoutMode === 'vertical'
+          ? `総行数: ${ws.rowCount}行 / 検出項目: ${items.length}項目（入力先: ${getColLetter(valueCol)}列）`
+          : `総行数: ${ws.rowCount}行 / 検出列数: ${state.targetColumns.length}列`;
+      }
+    }
+
+    function updateClearColumnSelect() {
+      const select = document.getElementById('clear-col-select');
+      if (!select) return;
+      select.innerHTML = '';
+
+      const colC = state.targetColumns.find(c => c.colNumber === 3);
+      const opt = document.createElement('option');
+      opt.value = '3';
+      opt.textContent = colC ? `C列（${colC.headerName}）` : 'C列';
+      select.appendChild(opt);
+      select.value = '3';
+    }
+
+    function confirmClearTargetColumn() {
+      if (!state.targetWorkbook) return;
+      const colNumber = parseInt(document.getElementById('clear-col-select').value, 10) || 3;
+      const colLetter = getColLetter(colNumber);
+      const colInfo = state.targetColumns.find(c => c.colNumber === colNumber);
+      const label = colInfo ? `${colLetter}列（${colInfo.headerName}）` : `${colLetter}列`;
+
+      showConfirmModal(
+        '列データのクリア確認',
+        `反映先シート「${state.targetSheetName}」の ${label} の既存データ（${state.targetDataStartRow}行目以降）をすべてクリアしますか？\n※見出し行と数式セルは保護されます。`,
+        () => executeClearTargetColumn(colNumber)
+      );
+    }
+
+    function executeClearTargetColumn(colNumber) {
+      const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+      if (!ws) return;
+
+      for (let r = state.targetDataStartRow; r <= ws.rowCount; r++) {
+        const cell = ws.getRow(r).getCell(colNumber);
+        if (!isCellFormula(cell)) cell.value = null;
+      }
+
+      if (!state.clearedColumns.includes(colNumber)) {
+        state.clearedColumns.push(colNumber);
+      }
+
+      extractVerticalItems();
+      updateClearedColumnsUI();
+      renderTargetPreview(ws);
+      scheduleAutoSave();
+      showToast(`${getColLetter(colNumber)}列の既存データをクリアしました。`, 'success');
+    }
+
+    async function undoClearedColumns() {
+      if (!state.targetArrayBuffer) return;
+      try {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(state.targetArrayBuffer.slice(0));
+        state.targetWorkbook = wb;
+        state.clearedColumns = [];
+        extractVerticalItems();
+        updateClearedColumnsUI();
+        const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+        renderTargetPreview(ws);
+        scheduleAutoSave();
+        showToast('列データのクリアを取り消しました。', 'info');
+      } catch (err) {
+        console.error(err);
+        showToast('元に戻す処理に失敗しました。', 'error');
+      }
+    }
+
+    function updateClearedColumnsUI() {
+      const badgeArea = document.getElementById('cleared-columns-badge-area');
+      const undoBtn = document.getElementById('btn-undo-clear');
+      if (!badgeArea || !undoBtn) return;
+
+      if (state.clearedColumns.length > 0) {
+        const labels = state.clearedColumns.map(n => `${getColLetter(n)}列`).join('・');
+        badgeArea.textContent = `※ ${labels} の既存データはクリア済みです（出力されるExcelにも反映されます）`;
+        badgeArea.classList.remove('hidden');
+        undoBtn.classList.remove('hidden');
+      } else {
+        badgeArea.classList.add('hidden');
+        undoBtn.classList.add('hidden');
+      }
+    }
+
+    function toggleTargetPreviewAllRows() {
+      state.showAllTargetPreviewRows = !state.showAllTargetPreviewRows;
+      const ws = state.targetWorkbook ? state.targetWorkbook.getWorksheet(state.targetSheetName) : null;
+      if (ws) renderTargetPreview(ws);
+    }
+
+    function renderTargetPreview(ws) {
+      const table = document.getElementById('target-preview-table');
+      const toggleBtn = document.getElementById('btn-toggle-all-rows');
+      if (!table || !ws) return;
+
+      const totalRows = Math.max(ws.rowCount || 1, state.targetHeaderRow);
+      const maxCols = Math.min(Math.max(state.targetColumns.length, 4), 20);
+      const maxRows = state.showAllTargetPreviewRows
+        ? totalRows
+        : Math.min(totalRows, state.targetHeaderRow + 19);
+
+      if (toggleBtn) {
+        if (totalRows <= state.targetHeaderRow + 19) {
+          toggleBtn.classList.add('hidden');
+        } else {
+          toggleBtn.classList.remove('hidden');
+          toggleBtn.textContent = state.showAllTargetPreviewRows
+            ? '先頭20行に戻す'
+            : `全${totalRows}行を表示する`;
+        }
+      }
+
+      let html = '<thead class="bg-stone-100 text-slate-600 font-bold sticky top-0 z-10"><tr><th class="px-2.5 py-2 border-r border-stone-200 text-center w-12">行</th>';
+      for (let c = 1; c <= maxCols; c++) {
+        let tag = '';
+        let bg = '';
+        if (state.layoutMode === 'vertical') {
+          if (c === state.verticalCols.itemCol) { tag = ' [項目]'; bg = 'bg-stone-200/80 text-slate-800'; }
+          else if (c === state.verticalCols.valueCol) { tag = ' [入力先]'; bg = 'bg-teal-100 text-[#0f524c]'; }
+          else if (c === state.verticalCols.guideCol) { tag = ' [書き方]'; bg = 'bg-amber-100 text-amber-900'; }
+        } else if (c === 3) {
+          bg = 'bg-rose-50 text-rose-700';
+        }
+        html += `<th class="px-3 py-2 border-r border-stone-200 text-left whitespace-nowrap ${bg}">${getColLetter(c)}${tag}</th>`;
+      }
+      html += '</tr></thead><tbody class="divide-y divide-stone-200 bg-white">';
+
+      for (let r = 1; r <= maxRows; r++) {
+        const isHeader = r === state.targetHeaderRow;
+        html += `<tr class="${isHeader ? 'bg-teal-50 font-bold text-[#0f524c]' : ''}">`;
+        html += `<td class="px-2.5 py-1.5 border-r border-stone-200 text-center text-slate-400 font-mono">${r}</td>`;
+        const row = ws.getRow(r);
+        for (let c = 1; c <= maxCols; c++) {
+          const val = extractCellText(row.getCell(c));
+          const isCleared = !isHeader && r >= state.targetDataStartRow && state.clearedColumns.includes(c);
+          html += `<td class="px-3 py-1.5 border-r border-stone-100 whitespace-nowrap max-w-[240px] truncate ${isCleared ? 'bg-rose-50/40 text-slate-300 italic' : ''}">${isCleared ? '(クリア済)' : escapeHtml(val)}</td>`;
+        }
+        html += '</tr>';
+      }
+      if (!state.showAllTargetPreviewRows && totalRows > maxRows) {
+        html += `<tr><td colspan="${maxCols + 1}" class="px-3 py-2 text-center text-slate-500 bg-stone-50 font-semibold">…他 ${totalRows - maxRows}行（「全${totalRows}行を表示する」で確認可能）</td></tr>`;
+      }
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    // =========================================================================
+    // STEP 2: 元データの取り込み（Excel / CSV / PDF / コピペ）
+    // =========================================================================
+    function switchSourceTab(tab) {
+      const btnFile = document.getElementById('tab-src-file');
+      const btnPaste = document.getElementById('tab-src-paste');
+      const panelFile = document.getElementById('panel-src-file');
+      const panelPaste = document.getElementById('panel-src-paste');
+
+      if (tab === 'file') {
+        btnFile.className = 'src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-[#0f766e] text-white shadow-sm';
+        btnPaste.className = 'src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-stone-100 text-slate-600 hover:bg-stone-200';
+        panelFile.classList.remove('hidden');
+        panelPaste.classList.add('hidden');
+      } else {
+        btnPaste.className = 'src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-[#0f766e] text-white shadow-sm';
+        btnFile.className = 'src-tab px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition bg-stone-100 text-slate-600 hover:bg-stone-200';
+        panelPaste.classList.remove('hidden');
+        panelFile.classList.add('hidden');
+      }
+    }
+
+    async function handleSourceFiles(fileList) {
+      const files = Array.from(fileList);
+      if (files.length === 0) return;
+
+      document.getElementById('source-excel-sheet-picker').classList.add('hidden');
+      document.getElementById('source-pdf-options').classList.add('hidden');
+
+      const pdfFiles = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length > 0) {
+        await handleSourcePdfFiles(pdfFiles);
+        return;
+      }
+
+      const file = files[0];
+      const lower = file.name.toLowerCase();
+
+      if (lower.endsWith('.xlsx')) {
+        await handleSourceExcelFile(file);
+      } else if (lower.endsWith('.csv') || lower.endsWith('.tsv') || lower.endsWith('.txt')) {
+        await handleSourceDelimitedFile(file);
+      } else {
+        showToast('対応していないファイル形式です（.xlsx / .csv / .tsv / .pdf に対応）。', 'error');
+      }
+    }
+
+    async function handleSourceExcelFile(file) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(buffer);
+
+        state.sourceWorkbook = wb;
+        state.sourceFileName = file.name;
+
+        const picker = document.getElementById('source-excel-sheet-picker');
+        const select = document.getElementById('source-sheet-select');
+        select.innerHTML = '';
+        wb.worksheets.forEach(ws => {
+          const opt = document.createElement('option');
+          opt.value = ws.name;
+          opt.textContent = ws.name;
+          select.appendChild(opt);
+        });
+        document.getElementById('source-excel-header-row').value = 1;
+        picker.classList.remove('hidden');
+
+        onSourceExcelSheetChange();
+        showToast(`Excel「${file.name}」を読み込みました。`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('元Excelファイルの読み込みに失敗しました。', 'error');
+      }
+    }
+
+    function onSourceExcelSheetChange() {
+      if (!state.sourceWorkbook) return;
+      const sheetName = document.getElementById('source-sheet-select').value;
+      const headerRowNum = Math.max(1, parseInt(document.getElementById('source-excel-header-row').value, 10) || 1);
+      const hasHeader = document.getElementById('source-has-header').checked;
+      const ws = state.sourceWorkbook.getWorksheet(sheetName);
+      if (!ws) return;
+
+      const matrix = [];
+      for (let r = headerRowNum; r <= ws.rowCount; r++) {
+        const row = ws.getRow(r);
+        const vals = [];
+        let nonEmpty = false;
+        const maxCol = Math.max(ws.columnCount || 0, row.cellCount || 0);
+        for (let c = 1; c <= maxCol; c++) {
+          const t = extractCellText(row.getCell(c)).trim();
+          if (t !== '') nonEmpty = true;
+          vals.push(t);
+        }
+        if (nonEmpty) matrix.push(vals);
+      }
+
+      const rawText = matrix.map(r => r.filter(Boolean).join('\t')).join('\n');
+      setSourceDataFromMatrix(matrix, hasHeader, `${state.sourceFileName} [${sheetName}]`, rawText);
+    }
+
+    async function handleSourceDelimitedFile(file) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const encodingChoice = document.getElementById('csv-encoding').value;
+        let text = '';
+
+        if (encodingChoice === 'shift-jis') {
+          text = new TextDecoder('shift-jis').decode(buffer);
+        } else if (encodingChoice === 'utf-8') {
+          text = new TextDecoder('utf-8').decode(buffer);
+        } else {
+          const utf8Text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+          text = utf8Text.includes('�') ? new TextDecoder('shift-jis').decode(buffer) : utf8Text;
+        }
+
+        text = text.replace(/^﻿/, '');
+        const hasHeader = document.getElementById('source-has-header').checked;
+        const matrix = parseDelimitedText(text);
+        setSourceDataFromMatrix(matrix, hasHeader, file.name, text);
+        showToast(`「${file.name}」から読み込みました。`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('CSV/テキストファイルの読み込みに失敗しました。', 'error');
+      }
+    }
+
+    async function handleSourcePdfFiles(pdfFiles) {
+      if (typeof pdfjsLib === 'undefined') {
+        showToast('PDF解析ライブラリの読み込みが完了していません。', 'error');
+        return;
+      }
+      try {
+        showToast(`PDF（${pdfFiles.length}ファイル）を解析しています...`, 'info');
+        const docs = [];
+
+        for (const file of pdfFiles) {
+          const buffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+          const pages = [];
+
+          for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+            const items = textContent.items
+              .filter(it => it.str && it.str.trim() !== '')
+              .map(it => ({
+                str: it.str.trim(),
+                x: Math.round(it.transform[4]),
+                y: Math.round(it.transform[5]),
+                w: Math.round(it.width || 0),
+              }));
+            pages.push(items);
+          }
+          docs.push({ fileName: file.name, pages });
+        }
+
+        state.pdfDocuments = docs;
+        state.sourceFileName = pdfFiles.length === 1 ? pdfFiles[0].name : `${pdfFiles[0].name} 他${pdfFiles.length - 1}件`;
+        document.getElementById('source-pdf-options').classList.remove('hidden');
+        extractFromLoadedPdfs();
+      } catch (err) {
+        console.error(err);
+        showToast('PDFの解析に失敗しました。テキスト選択可能なPDFかご確認ください。', 'error');
+      }
+    }
+
+    function onPdfModeChange() {
+      extractFromLoadedPdfs();
+    }
+
+    function groupPdfPageItemsIntoLines(items) {
+      if (!items || items.length === 0) return [];
+      const sorted = [...items].sort((a, b) => Math.abs(a.y - b.y) > 6 ? b.y - a.y : a.x - b.x);
+
+      const lines = [];
+      for (const item of sorted) {
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && Math.abs(lastLine.y - item.y) <= 6) {
+          lastLine.items.push(item);
+        } else {
+          lines.push({ y: item.y, items: [item] });
+        }
+      }
+
+      return lines.map(line => {
+        line.items.sort((a, b) => a.x - b.x);
+        const cells = [];
+        for (const it of line.items) {
+          const prev = cells[cells.length - 1];
+          if (prev && (it.x - (prev.x + prev.w)) < 14) {
+            prev.text += (it.x - (prev.x + prev.w) > 3 ? ' ' : '') + it.str;
+            prev.w = (it.x + it.w) - prev.x;
+          } else {
+            cells.push({ x: it.x, w: it.w, text: it.str });
+          }
+        }
+        return cells.map(c => c.text.trim()).filter(t => t !== '');
+      }).filter(row => row.length > 0);
+    }
+
+    function extractFromLoadedPdfs() {
+      if (!state.pdfDocuments || state.pdfDocuments.length === 0) return;
+      const mode = document.getElementById('pdf-extract-mode').value;
+      const hasHeader = document.getElementById('source-has-header').checked;
+      const rawLines = [];
+
+      if (mode === 'table') {
+        const matrix = [];
+        for (const doc of state.pdfDocuments) {
+          for (const pageItems of doc.pages) {
+            const lines = groupPdfPageItemsIntoLines(pageItems);
+            lines.forEach(cols => {
+              matrix.push(cols);
+              rawLines.push(cols.join('\t'));
+            });
+          }
+        }
+        if (matrix.length === 0) {
+          showToast('PDFから文字を抽出できませんでした（画像のみのPDFは非対応です）。', 'warning');
+          return;
+        }
+        const rawText = rawLines.join('\n');
+        document.getElementById('pdf-raw-textarea').value = rawText;
+        setSourceDataFromMatrix(matrix, hasHeader, `${state.sourceFileName} (PDF表抽出)`, rawText);
+        showToast(`PDFから ${state.sourceRows.length}行 抽出しました。`, 'success');
+      } else {
+        const records = [];
+        const headerSet = new Set(['ファイル名']);
+        for (const doc of state.pdfDocuments) {
+          const rec = { 'ファイル名': doc.fileName };
+          rawLines.push(`=== ${doc.fileName} ===`);
+          for (const pageItems of doc.pages) {
+            const lines = groupPdfPageItemsIntoLines(pageItems);
+            for (const cols of lines) {
+              rawLines.push(cols.join('\t'));
+              if (cols.length === 1) {
+                const m = cols[0].match(/^([^：:]+)[：:]\s*(.+)$/);
+                if (m) {
+                  const k = m[1].trim();
+                  const v = m[2].trim();
+                  if (k && v) {
+                    headerSet.add(k);
+                    rec[k] = rec[k] ? `${rec[k]} / ${v}` : v;
+                  }
+                }
+              } else if (cols.length >= 2) {
+                for (let i = 0; i + 1 < cols.length; i += 2) {
+                  const k = cols[i].replace(/[：:]$/, '').trim();
+                  const v = cols[i + 1].trim();
+                  if (k) {
+                    headerSet.add(k);
+                    rec[k] = rec[k] ? `${rec[k]} / ${v}` : v;
+                  }
+                }
+              }
+            }
+          }
+          records.push(rec);
+        }
+
+        const headers = Array.from(headerSet);
+        const matrix = [headers];
+        records.forEach(r => matrix.push(headers.map(h => r[h] || '')));
+        const rawText = rawLines.join('\n');
+        document.getElementById('pdf-raw-textarea').value = rawText;
+        setSourceDataFromMatrix(matrix, true, `${state.sourceFileName} (PDF帳票抽出)`, rawText);
+        showToast(`PDFから帳票データを抽出しました。`, 'success');
+      }
+    }
+
+    function togglePdfRawEditor() {
+      const wrap = document.getElementById('pdf-raw-editor-wrap');
+      if (wrap) wrap.classList.toggle('hidden');
+    }
+
+    function applyEditedPdfText() {
+      const text = document.getElementById('pdf-raw-textarea').value.trim();
+      if (!text) return;
+      const hasHeader = document.getElementById('source-has-header').checked;
+      const matrix = parseDelimitedText(text);
+      setSourceDataFromMatrix(matrix, hasHeader, `${state.sourceFileName} (手動調整)`, text);
+      showToast('調整したPDFテキストを再適用しました。', 'success');
+    }
+
+    function parsePastedText() {
+      const text = document.getElementById('paste-input').value.trim();
+      if (!text) {
+        showToast('貼り付け欄にデータを入力してください。', 'warning');
+        return;
+      }
+      const hasHeader = document.getElementById('paste-has-header').checked;
+      const matrix = parseDelimitedText(text);
+      setSourceDataFromMatrix(matrix, hasHeader, 'コピー＆ペーストデータ', text);
+      showToast('貼り付けデータを読み込みました。', 'success');
+    }
+
+    function parseDelimitedText(text) {
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim() !== '');
+      if (lines.length === 0) return [];
+
+      const tabCount = (lines[0].match(/\t/g) || []).length;
+      const commaCount = (lines[0].match(/,/g) || []).length;
+
+      if (tabCount > 0 && tabCount >= commaCount) {
+        return lines.map(line => line.split('\t').map(v => v.trim()));
+      }
+      if (commaCount > 0) {
+        return lines.map(line => {
+          const cols = [];
+          let cur = '';
+          let inQ = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+              if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+              else inQ = !inQ;
+            } else if (ch === ',' && !inQ) {
+              cols.push(cur.trim()); cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+          cols.push(cur.trim());
+          return cols;
+        });
+      }
+      return lines.map(line => {
+        const m = line.match(/^([^：:]+)[：:]\s*(.+)$/);
+        return m ? [m[1].trim(), m[2].trim()] : [line.trim()];
+      });
+    }
+
+    function setSourceDataFromMatrix(matrix, hasHeader, sourceLabel, rawText = '') {
+      if (!matrix || matrix.length === 0) {
+        showToast('有効なデータが見つかりませんでした。', 'warning');
+        return;
+      }
+
+      const maxCols = Math.max(...matrix.map(r => r.length));
+      let headers = [];
+      let dataRows = [];
+
+      if (hasHeader && matrix.length > 1) {
+        const rawHeaders = matrix[0];
+        const used = {};
+        for (let c = 0; c < maxCols; c++) {
+          let h = (rawHeaders[c] || '').trim() || `項目${c + 1}`;
+          if (used[h]) { used[h]++; h = `${h}_${used[h]}`; }
+          else used[h] = 1;
+          headers.push(h);
+        }
+        dataRows = matrix.slice(1);
+      } else {
+        for (let c = 0; c < maxCols; c++) headers.push(`列${c + 1}`);
+        dataRows = matrix;
+      }
+
+      const objects = dataRows
+        .filter(r => r.some(cell => String(cell || '').trim() !== ''))
+        .map(r => {
+          const obj = {};
+          headers.forEach((h, idx) => { obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+          return obj;
+        });
+
+      state.sourceHeaders = headers;
+      state.sourceRows = objects;
+      state.sourceRawText = rawText || matrix.map(r => r.join('\t')).join('\n');
+      state.sourceFileName = sourceLabel;
+      state.verticalPlan = [];
+      state.horizontalPlan = [];
+      state.aiReasoning = '';
+      document.getElementById('ai-result-box').classList.add('hidden');
+
+      renderSourcePreview();
+      updateStepUI();
+      scheduleAutoSave();
+    }
+
+    function renderSourcePreview() {
+      const area = document.getElementById('source-preview-area');
+      const table = document.getElementById('source-preview-table');
+      const badge = document.getElementById('source-count-badge');
+      const label = document.getElementById('source-name-label');
+
+      if (state.sourceRows.length === 0) {
+        area.classList.add('hidden');
+        return;
+      }
+
+      area.classList.remove('hidden');
+      badge.textContent = `${state.sourceRows.length}行`;
+      label.textContent = state.sourceFileName;
+
+      let html = '<thead class="bg-stone-100 text-slate-600 font-bold sticky top-0"><tr><th class="px-2.5 py-2 border-r border-stone-200 text-center w-10">#</th>';
+      state.sourceHeaders.forEach(h => {
+        html += `<th class="px-3 py-2 border-r border-stone-200 text-left whitespace-nowrap">${escapeHtml(h)}</th>`;
+      });
+      html += '</tr></thead><tbody class="divide-y divide-stone-200 bg-white">';
+
+      const limit = Math.min(state.sourceRows.length, 30);
+      for (let i = 0; i < limit; i++) {
+        const row = state.sourceRows[i];
+        html += `<tr><td class="px-2.5 py-1.5 border-r border-stone-200 text-center text-slate-400 font-mono">${i + 1}</td>`;
+        state.sourceHeaders.forEach(h => {
+          html += `<td class="px-3 py-1.5 border-r border-stone-100 whitespace-nowrap max-w-[260px] truncate">${escapeHtml(row[h])}</td>`;
+        });
+        html += '</tr>';
+      }
+      if (state.sourceRows.length > limit) {
+        html += `<tr><td colspan="${state.sourceHeaders.length + 1}" class="px-3 py-2 text-center text-slate-400 bg-stone-50">…他 ${state.sourceRows.length - limit}行</td></tr>`;
+      }
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function clearSourceData() {
+      state.sourceHeaders = [];
+      state.sourceRows = [];
+      state.sourceRawText = '';
+      state.sourceWorkbook = null;
+      state.pdfDocuments = [];
+      state.verticalPlan = [];
+      state.horizontalPlan = [];
+      document.getElementById('source-preview-area').classList.add('hidden');
+      document.getElementById('source-excel-sheet-picker').classList.add('hidden');
+      document.getElementById('source-pdf-options').classList.add('hidden');
+      document.getElementById('ai-result-box').classList.add('hidden');
+      updateStepUI();
+      scheduleAutoSave();
+      showToast('元データをクリアしました。', 'info');
+    }
+
+    function loadSampleSourceData() {
+      const sampleText = [
+        '利用者氏名：山田 太郎',
+        'フリガナ：ヤマダ タロウ',
+        '受給者証番号：1000555111',
+        '生年月日：昭和60年4月12日（1985年4月12日）',
+        '障害支援区分：区分3',
+        '本人の希望：無理のないペースで週3日ほどB型事業所で軽作業を続けて、生活リズムを整えたい。',
+        '利用サービス：就労継続支援B型（週3日・月水金）',
+        '計画作成日：2026年11月23日',
+      ].join('\n');
+      const matrix = parseDelimitedText(sampleText);
+      setSourceDataFromMatrix(matrix, false, 'サンプルアセスメント資料.pdf', sampleText);
+      showToast('サンプルの元データを読み込みました。', 'success');
+    }
+
+    // =========================================================================
+    // STEP 3: AI判定（縦型フォーム & 横型一覧の両対応）
+    // =========================================================================
+    function refreshStep3UI() {
+      updateAiKeyIndicator();
+      const isVertical = state.layoutMode === 'vertical';
+      document.getElementById('vertical-options-box').classList.toggle('hidden', !isVertical);
+      document.getElementById('horizontal-options-box').classList.toggle('hidden', isVertical);
+
+      const desc = document.getElementById('step3-mode-desc');
+      const vSum = document.getElementById('vertical-target-summary');
+      const sSum = document.getElementById('ai-source-summary');
+
+      if (isVertical) {
+        if (desc) desc.textContent = 'ステップ2で読み込んだ元データをもとに、シートの「項目名」と「書き方（記入例）」をAIが読み取って「入力内容」欄へ自動入力します。';
+        if (vSum) vSum.textContent = `項目数: ${state.verticalItems.length}件 / 入力先: ${getColLetter(state.verticalCols.valueCol)}列`;
+        if (sSum) sSum.textContent = `元データ: ${state.sourceFileName || '読込済'} → ${state.targetSheetName}`;
+      } else {
+        if (desc) desc.textContent = '元データと既存シートの列構成・記入例をAIが解析し、各列へ適切な形式で自動変換します。';
+        if (sSum) sSum.textContent = `元データ ${state.sourceRows.length}件 → ${state.targetSheetName}（${state.targetColumns.length}列）`;
+        const keySelect = document.getElementById('upsert-key-col');
+        if (keySelect) {
+          keySelect.innerHTML = '';
+          state.targetColumns.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col.colNumber;
+            opt.textContent = `${col.colLetter}列：${col.headerName}`;
+            keySelect.appendChild(opt);
+          });
+        }
+        onWriteModeChange();
+      }
+    }
+
+    function onWriteModeChange() {
+      const mode = document.getElementById('write-mode').value;
+      const keyContainer = document.getElementById('upsert-key-container');
+      if (keyContainer) keyContainer.classList.toggle('hidden', mode !== 'upsert');
+    }
+
+    function proceedFromStep3() {
+      const hasPlan = state.layoutMode === 'vertical'
+        ? state.verticalPlan.length > 0
+        : state.horizontalPlan.length > 0;
+      if (hasPlan) {
+        goToStep(4);
+      } else {
+        runAiDataIntegration(true);
+      }
+    }
+
+    // AI呼び出しの失敗理由を区別するためのエラー
+    class AiCallError extends Error {
+      constructor(code, message) {
+        super(message);
+        this.code = code;
+      }
+    }
+
+    async function callGeminiWithBackoff(payload, maxRetries = 5) {
+      const apiKey = getApiKey();
+      if (!apiKey) throw new AiCallError('NO_API_KEY', 'APIキー未設定');
+      const model = encodeURIComponent(getAiModel());
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+      let delay = 1000;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        let response;
+        try {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify(payload),
+          });
+        } catch (netErr) {
+          // 通信エラー（オフライン等）は再試行
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+            continue;
+          }
+          throw new AiCallError('NETWORK', 'インターネットに接続できません');
+        }
+
+        if (response.ok) return await response.json();
+        if ((response.status === 429 || response.status >= 500) && attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2;
+          continue;
+        }
+        const errText = await response.text().catch(() => '');
+        if (response.status === 400 && /API key/i.test(errText)) throw new AiCallError('BAD_KEY', errText);
+        if (response.status === 401 || response.status === 403) throw new AiCallError('BAD_KEY', errText);
+        if (response.status === 404) throw new AiCallError('BAD_MODEL', errText);
+        if (response.status === 429) throw new AiCallError('RATE_LIMIT', errText);
+        throw new AiCallError('API', `API Error (${response.status}): ${errText}`);
+      }
+    }
+
+    async function runAiDataIntegration(autoGoStep4 = false) {
+      if (!state.targetWorkbook || (state.sourceRows.length === 0 && !state.sourceRawText)) {
+        showToast('反映先Excelと元データを先に読み込んでください。', 'warning');
+        return;
+      }
+      if (!getApiKey()) {
+        showToast('先に「⚙ AI設定」でGemini APIキーを登録してください。', 'warning');
+        openAiSettings();
+        return;
+      }
+
+      const btn = document.getElementById('btn-run-ai');
+      const btnText = document.getElementById('ai-btn-text');
+      const progressArea = document.getElementById('ai-progress-area');
+      const progressLabel = document.getElementById('ai-progress-label');
+      const progressPercent = document.getElementById('ai-progress-percent');
+      const progressBar = document.getElementById('ai-progress-bar');
+      const resultBox = document.getElementById('ai-result-box');
+
+      btn.disabled = true;
+      btnText.textContent = 'AIが解析・入力内容を作成中...';
+      progressArea.classList.remove('hidden');
+      resultBox.classList.add('hidden');
+
+      try {
+        if (state.layoutMode === 'vertical') {
+          await runVerticalAiFill(progressLabel, progressPercent, progressBar);
+        } else {
+          await runHorizontalAiFill(progressLabel, progressPercent, progressBar);
+        }
+
+        document.getElementById('ai-reasoning-text').textContent = state.aiReasoning;
+        resultBox.classList.remove('hidden');
+        updateStepUI();
+        scheduleAutoSave();
+        showToast('AIによる入力内容の作成が完了しました！', 'success');
+
+        if (autoGoStep4) {
+          goToStep(4);
+        }
+      } catch (err) {
+        console.error(err);
+        progressArea.classList.add('hidden');
+        const messages = {
+          NO_API_KEY: '先に「⚙ AI設定」でGemini APIキーを登録してください。',
+          BAD_KEY: 'APIキーが正しくないか、権限がありません。「⚙ AI設定」をご確認ください。',
+          BAD_MODEL: '指定したAIモデルが見つかりません。「⚙ AI設定」のモデル名をご確認ください。',
+          RATE_LIMIT: 'AIの利用上限に達しました。少し時間をおいて再度お試しください。',
+          NETWORK: 'インターネットに接続できません。通信環境をご確認ください。',
+        };
+        showToast(messages[err.code] || 'AIの解析中にエラーが発生しました。時間をおいて再度お試しください。', 'error');
+        if (err.code === 'NO_API_KEY' || err.code === 'BAD_KEY' || err.code === 'BAD_MODEL') openAiSettings();
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'AIで項目名と書き方から入力内容を作成';
+      }
+    }
+
+    async function runVerticalAiFill(progressLabel, progressPercent, progressBar) {
+      extractVerticalItems();
+      const protectExisting = document.getElementById('v-protect-existing').checked;
+      const protectFormula = document.getElementById('v-protect-formula').checked;
+      const customInstruction = (document.getElementById('ai-custom-instruction')?.value || '').trim();
+
+      const itemsToFill = state.verticalItems.filter(it => {
+        if (protectFormula && it.isFormula) return false;
+        if (protectExisting && it.existingValue !== '') return false;
+        return true;
+      });
+
+      const systemPrompt = `あなたは福祉・計画相談支援業務に精通したデータ入力アシスタントです。
+ユーザーから渡される「元データ（アセスメント資料・名簿・PDFテキスト等）」をもとに、Excelシートの各行の「項目名（itemName）」と「書き方・記入例（guideText）」を正確に読み取り、適切な「入力内容（value）」を作成してください。
+
+【厳守ルール】
+1. 必ず各行の「書き方・記入例（guideText）」の書式ルール（西暦/和暦、日付形式、スペースの有無、カタカナ、文体「です・ます調」や文字数など）を最優先で守ってください。
+2. 元データに該当する情報が見当たらない項目は、架空の個人情報を捏造せず空文字 "" にしてください。
+3. 渡されたすべての rowNumber に対して結果を返してください。
+4. reasoning には、どの項目をどのように書き方に合わせて入力したか（また情報不足で空欄にした項目があればその旨）を日本語で簡潔にまとめてください。`;
+
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          reasoning: { type: "STRING" },
+          entries: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                rowNumber: { type: "INTEGER" },
+                value: { type: "STRING" }
+              },
+              required: ["rowNumber", "value"]
+            }
+          }
+        },
+        required: ["reasoning", "entries"]
+      };
+
+      const BATCH_SIZE = 25;
+      const totalBatches = Math.max(1, Math.ceil(itemsToFill.length / BATCH_SIZE));
+      const aiValueMap = new Map();
+      const reasonings = [];
+
+      const sourceTextForAi = (state.sourceRawText || JSON.stringify(state.sourceRows)).slice(0, 18000);
+
+      for (let b = 0; b < totalBatches; b++) {
+        const start = b * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, itemsToFill.length);
+        const batchItems = itemsToFill.slice(start, end);
+        if (batchItems.length === 0) break;
+
+        const pct = Math.max(10, Math.round(((b + 0.5) / totalBatches) * 90));
+        progressLabel.textContent = `項目名と書き方を読み込み、入力内容を作成中...（${start + 1}〜${end}項目 / 全${itemsToFill.length}項目）`;
+        progressPercent.textContent = `${pct}%`;
+        progressBar.style.width = `${pct}%`;
+
+        const userQuery = JSON.stringify({
+          sheetName: state.targetSheetName,
+          userAdditionalInstruction: customInstruction || '書き方・記入例のルールに忠実に従ってください。',
+          sourceDataText: sourceTextForAi,
+          targetFormItems: batchItems.map(it => ({
+            rowNumber: it.rowNumber,
+            itemName: it.itemName,
+            guideText: it.guideText || '（書き方指定なし：一般的な計画相談の表記で入力）',
+          })),
+        }, null, 2);
+
+        const payload = {
+          contents: [{ parts: [{ text: userQuery }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: responseSchema,
+          },
+        };
+
+        const result = await callGeminiWithBackoff(payload);
+        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('AI応答が空です');
+
+        const parsed = JSON.parse(text);
+        if (parsed.reasoning) reasonings.push(parsed.reasoning);
+        if (Array.isArray(parsed.entries)) {
+          parsed.entries.forEach(entry => {
+            aiValueMap.set(entry.rowNumber, entry.value !== undefined && entry.value !== null ? String(entry.value) : '');
+          });
+        }
+      }
+
+      progressLabel.textContent = `全${state.verticalItems.length}項目の解析が完了しました！`;
+      progressPercent.textContent = '100%';
+      progressBar.style.width = '100%';
+
+      state.verticalPlan = state.verticalItems.map(it => {
+        const isProtected = (protectFormula && it.isFormula) || (protectExisting && it.existingValue !== '');
+        if (isProtected) {
+          return {
+            rowNumber: it.rowNumber,
+            itemName: it.itemName,
+            guideText: it.guideText,
+            value: it.existingValue,
+            status: 'preserved',
+            isFormula: it.isFormula,
+          };
+        }
+        const aiVal = aiValueMap.has(it.rowNumber) ? aiValueMap.get(it.rowNumber) : '';
+        return {
+          rowNumber: it.rowNumber,
+          itemName: it.itemName,
+          guideText: it.guideText,
+          value: aiVal,
+          status: aiVal.trim() !== '' ? 'ai' : 'empty',
+          isFormula: false,
+        };
+      });
+
+      state.aiReasoning = reasonings.slice(0, 5).join('\n') || '元データから項目名と書き方に合わせて入力内容を作成しました。';
+    }
+
+    async function runHorizontalAiFill(progressLabel, progressPercent, progressBar) {
+      const customInstruction = (document.getElementById('ai-custom-instruction')?.value || '').trim();
+      const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+
+      const existingSamples = [];
+      const endSample = Math.min(state.targetLastDataRow, state.targetDataStartRow + 2);
+      for (let r = state.targetDataStartRow; r <= endSample; r++) {
+        const row = ws.getRow(r);
+        const obj = {};
+        let hasAny = false;
+        state.targetColumns.forEach(col => {
+          const v = extractCellText(row.getCell(col.colNumber)).trim();
+          if (v !== '') hasAny = true;
+          obj[`${col.colLetter}列(${col.headerName})`] = v;
+        });
+        if (hasAny) existingSamples.push(obj);
+      }
+
+      const systemPrompt = `あなたは福祉・計画相談支援業務のデータ転記アシスタントです。
+反映先Excelの列構成と既存記入例を参考に、元データの各行を適切な列番号(colNumber)に割り当てて表記を統一してください。推測で架空の個人情報を捏造せず、該当データがない列は空文字 "" にしてください。`;
+
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          reasoning: { type: "STRING" },
+          rows: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                cells: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      colNumber: { type: "INTEGER" },
+                      value: { type: "STRING" }
+                    },
+                    required: ["colNumber", "value"]
+                  }
+                }
+              },
+              required: ["cells"]
+            }
+          }
+        },
+        required: ["reasoning", "rows"]
+      };
+
+      const BATCH_SIZE = 15;
+      const totalRows = state.sourceRows.length;
+      const totalBatches = Math.ceil(totalRows / BATCH_SIZE);
+      const convertedRows = [];
+      let firstReason = '';
+
+      for (let b = 0; b < totalBatches; b++) {
+        const start = b * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, totalRows);
+        const batch = state.sourceRows.slice(start, end);
+
+        const pct = Math.max(10, Math.round(((b + 0.5) / totalBatches) * 90));
+        progressLabel.textContent = `一覧データを変換中...（${start + 1}〜${end}件 / 全${totalRows}件）`;
+        progressPercent.textContent = `${pct}%`;
+        progressBar.style.width = `${pct}%`;
+
+        const payload = {
+          contents: [{
+            parts: [{
+              text: JSON.stringify({
+                targetColumns: state.targetColumns.map(c => ({ colNumber: c.colNumber, colLetter: c.colLetter, headerName: c.headerName })),
+                existingDataExamples: existingSamples,
+                userAdditionalInstruction: customInstruction || '既存データの表記に合わせて統一してください。',
+                sourceRowsToConvert: batch,
+              }, null, 2)
+            }]
+          }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { responseMimeType: "application/json", responseSchema },
+        };
+
+        const result = await callGeminiWithBackoff(payload);
+        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('AI応答が空です');
+        const parsed = JSON.parse(text);
+        if (b === 0 && parsed.reasoning) firstReason = parsed.reasoning;
+
+        (parsed.rows || []).forEach(r => {
+          const obj = {};
+          state.targetColumns.forEach(c => { obj[c.colNumber] = ''; });
+          (r.cells || []).forEach(cell => {
+            if (typeof cell.colNumber === 'number') obj[cell.colNumber] = String(cell.value ?? '');
+          });
+          convertedRows.push(obj);
+        });
+      }
+
+      progressLabel.textContent = `全${totalRows}件の変換が完了しました！`;
+      progressPercent.textContent = '100%';
+      progressBar.style.width = '100%';
+
+      const writeMode = document.getElementById('write-mode').value;
+      const upsertKeyCol = parseInt(document.getElementById('upsert-key-col').value, 10) || 1;
+      const skipEmpty = document.getElementById('skip-empty-overwrite').checked;
+
+      const existingKeyRowMap = new Map();
+      if (writeMode === 'upsert') {
+        for (let r = state.targetDataStartRow; r <= state.targetLastDataRow; r++) {
+          const v = extractCellText(ws.getRow(r).getCell(upsertKeyCol)).trim();
+          if (v !== '' && !existingKeyRowMap.has(v)) existingKeyRowMap.set(v, r);
+        }
+      }
+
+      let nextRow = writeMode === 'overwrite' ? state.targetDataStartRow : Math.max(state.targetDataStartRow, state.targetLastDataRow + 1);
+      const ops = [];
+
+      convertedRows.forEach(rowValues => {
+        if (writeMode === 'upsert') {
+          const k = String(rowValues[upsertKeyCol] ?? '').trim();
+          if (k !== '' && existingKeyRowMap.has(k)) {
+            const targetRowNum = existingKeyRowMap.get(k);
+            const merged = {};
+            state.targetColumns.forEach(col => {
+              const oldVal = state.clearedColumns.includes(col.colNumber) ? '' : extractCellText(ws.getRow(targetRowNum).getCell(col.colNumber));
+              const newVal = rowValues[col.colNumber] ?? '';
+              merged[col.colNumber] = (skipEmpty && String(newVal).trim() === '') ? oldVal : newVal;
+            });
+            ops.push({ type: 'update', targetRowNumber: targetRowNum, values: merged });
+            return;
+          }
+        }
+        const type = writeMode === 'overwrite' && nextRow <= state.targetLastDataRow ? 'update' : 'add';
+        ops.push({ type, targetRowNumber: nextRow, values: rowValues });
+        nextRow++;
+      });
+
+      state.horizontalPlan = ops;
+      state.aiReasoning = firstReason || '元データを反映先シートの列構造に合わせて変換しました。';
+    }
+
+    // =========================================================================
+    // STEP 4: プレビュー表示・直接編集・C列クリア・Excel出力
+    // =========================================================================
+    function renderStep4() {
+      const filenameInput = document.getElementById('export-filename-input');
+      if (filenameInput && !filenameInput.value.trim() && state.targetFileName) {
+        const base = state.targetFileName.replace(/\.xlsx$/i, '');
+        const now = new Date();
+        const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        filenameInput.value = `${base}_反映済_${stamp}`;
+      }
+
+      document.getElementById('summary-sheet-name').textContent = state.targetSheetName || '-';
+
+      if (state.layoutMode === 'vertical') {
+        renderVerticalPreviewTable();
+      } else {
+        renderHorizontalPreviewTable();
+      }
+    }
+
+    function renderVerticalPreviewTable() {
+      const table = document.getElementById('final-preview-table');
+      if (!table) return;
+
+      const aiCount = state.verticalPlan.filter(p => p.status === 'ai' || p.status === 'edited').length;
+      const preservedCount = state.verticalPlan.filter(p => p.status === 'preserved').length;
+      const valColLetter = getColLetter(state.verticalCols.valueCol);
+
+      document.getElementById('summary-card2-label').textContent = 'AI入力';
+      document.getElementById('summary-add-count').textContent = `${aiCount}項目`;
+      document.getElementById('summary-card3-label').textContent = '既存保護';
+      document.getElementById('summary-update-count').textContent = `${preservedCount}項目`;
+      document.getElementById('summary-card4-label').textContent = '対象シート';
+      document.getElementById('summary-mapped-cols').textContent = `縦型フォーム (${valColLetter}列)`;
+
+      let html = `<thead class="bg-stone-100 text-slate-600 font-bold sticky top-0 z-10">
+        <tr>
+          <th class="px-3 py-2.5 border-r border-stone-200 text-center w-24 whitespace-nowrap">行 / 状態</th>
+          <th class="px-3 py-2.5 border-r border-stone-200 text-left min-w-[160px]">項目名 (${getColLetter(state.verticalCols.itemCol)}列)</th>
+          <th class="px-3 py-2.5 border-r border-stone-200 text-left min-w-[260px] bg-teal-50 text-[#0f524c]">入力内容 (${valColLetter}列) ※タップで編集可</th>
+          <th class="px-3 py-2.5 text-left min-w-[220px]">書き方・記入例（参考）</th>
+        </tr>
+      </thead><tbody class="divide-y divide-stone-200 bg-white">`;
+
+      state.verticalPlan.forEach((item, idx) => {
+        let rowBg = 'bg-white';
+        let badge = '<span class="px-1.5 py-0.5 rounded bg-stone-100 text-slate-500 text-[10px] font-bold">空欄</span>';
+        if (item.status === 'ai') {
+          rowBg = 'bg-teal-50/50';
+          badge = '<span class="px-1.5 py-0.5 rounded bg-teal-100 text-[#0f524c] text-[10px] font-bold">AI入力</span>';
+        } else if (item.status === 'edited') {
+          rowBg = 'bg-sky-50/60';
+          badge = '<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold">修正済</span>';
+        } else if (item.status === 'preserved') {
+          rowBg = 'bg-amber-50/50';
+          badge = item.isFormula
+            ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">数式保護</span>'
+            : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">既存保護</span>';
+        }
+
+        const editableAttr = item.isFormula
+          ? 'class="px-3 py-2 border-r border-stone-200 text-slate-400 italic"'
+          : `contenteditable="true" onblur="onVerticalCellEdit(${idx}, this.innerText)" class="px-3 py-2 border-r border-stone-200 font-medium text-slate-900 bg-white/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 rounded whitespace-pre-wrap"`;
+
+        html += `<tr class="${rowBg}">
+          <td class="px-3 py-2 border-r border-stone-200 text-center whitespace-nowrap font-mono text-slate-600">${item.rowNumber}行 ${badge}</td>
+          <td class="px-3 py-2 border-r border-stone-200 font-semibold text-slate-800">${escapeHtml(item.itemName)}</td>
+          <td ${editableAttr}>${item.isFormula ? '(数式セルのため保護)' : escapeHtml(item.value)}</td>
+          <td class="px-3 py-2 text-slate-500 whitespace-pre-wrap">${escapeHtml(item.guideText || '-')}</td>
+        </tr>`;
+      });
+
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function onVerticalCellEdit(idx, newText) {
+      const item = state.verticalPlan[idx];
+      if (!item || item.isFormula) return;
+      const trimmed = newText.trim();
+      if (item.value !== trimmed) {
+        item.value = trimmed;
+        item.status = trimmed === '' ? 'empty' : 'edited';
+        scheduleAutoSave();
+      }
+    }
+
+    function renderHorizontalPreviewTable() {
+      const table = document.getElementById('final-preview-table');
+      if (!table) return;
+
+      const addCount = state.horizontalPlan.filter(op => op.type === 'add').length;
+      const updateCount = state.horizontalPlan.filter(op => op.type === 'update').length;
+
+      document.getElementById('summary-card2-label').textContent = '新規追加';
+      document.getElementById('summary-add-count').textContent = `${addCount}件`;
+      document.getElementById('summary-card3-label').textContent = '上書き更新';
+      document.getElementById('summary-update-count').textContent = `${updateCount}件`;
+      document.getElementById('summary-card4-label').textContent = '対象シート';
+      document.getElementById('summary-mapped-cols').textContent = '横型一覧表 (AI判断)';
+
+      let html = '<thead class="bg-stone-100 text-slate-600 font-bold sticky top-0 z-10"><tr>';
+      html += '<th class="px-3 py-2.5 border-r border-stone-200 text-center w-20 whitespace-nowrap">行 / 種別</th>';
+      state.targetColumns.forEach(col => {
+        const isC = col.colNumber === 3;
+        html += `<th class="px-3 py-2.5 border-r border-stone-200 text-left whitespace-nowrap ${isC ? 'bg-rose-50 text-rose-800' : ''}">
+          <span class="text-[10px] text-slate-400 font-mono mr-1">${col.colLetter}</span>${escapeHtml(col.headerName)}
+        </th>`;
+      });
+      html += '</tr></thead><tbody class="divide-y divide-stone-200 bg-white">';
+
+      state.horizontalPlan.forEach((op, opIdx) => {
+        const rowBg = op.type === 'add' ? 'bg-teal-50/50' : 'bg-amber-50/50';
+        const badge = op.type === 'add'
+          ? '<span class="px-1.5 py-0.5 rounded bg-teal-100 text-[#0f524c] text-[10px] font-bold">新規</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">更新</span>';
+
+        html += `<tr class="${rowBg}">`;
+        html += `<td class="px-3 py-2 border-r border-stone-200 text-center whitespace-nowrap font-mono text-slate-600">${op.targetRowNumber}行 ${badge}</td>`;
+        state.targetColumns.forEach(col => {
+          const val = op.values[col.colNumber] !== undefined ? op.values[col.colNumber] : '';
+          html += `<td contenteditable="true"
+            onblur="onHorizontalCellEdit(${opIdx}, ${col.colNumber}, this.innerText)"
+            class="px-3 py-2 border-r border-stone-200/80 whitespace-nowrap max-w-[240px] truncate focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 rounded">${escapeHtml(val)}</td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function onHorizontalCellEdit(opIdx, colNumber, newText) {
+      if (state.horizontalPlan[opIdx]) {
+        state.horizontalPlan[opIdx].values[colNumber] = newText.trim();
+        scheduleAutoSave();
+      }
+    }
+
+    function confirmClearPreviewColumnC() {
+      showConfirmModal(
+        'C列のデータ一括クリア確認',
+        '出力対象シートのC列（既存データおよび今回反映されるC列の入力内容）をすべて空欄にしますか？',
+        () => {
+          if (!state.clearedColumns.includes(3)) state.clearedColumns.push(3);
+          const ws = state.targetWorkbook.getWorksheet(state.targetSheetName);
+          if (ws) {
+            for (let r = state.targetDataStartRow; r <= ws.rowCount; r++) {
+              const cell = ws.getRow(r).getCell(3);
+              if (!isCellFormula(cell)) cell.value = null;
+            }
+          }
+          if (state.layoutMode === 'vertical' && state.verticalCols.valueCol === 3) {
+            state.verticalPlan.forEach(it => {
+              if (!it.isFormula) {
+                it.value = '';
+                it.status = 'empty';
+              }
+            });
+          } else {
+            state.horizontalPlan.forEach(op => {
+              if (op.values[3] !== undefined) op.values[3] = '';
+            });
+          }
+          updateClearedColumnsUI();
+          renderStep4();
+          scheduleAutoSave();
+          showToast('C列のデータを一括クリアしました。', 'success');
+        }
+      );
+    }
+
+    function copyRowStyle(sourceRow, targetRow, colCount) {
+      for (let c = 1; c <= colCount; c++) {
+        const srcCell = sourceRow.getCell(c);
+        const dstCell = targetRow.getCell(c);
+        if (srcCell.style) dstCell.style = JSON.parse(JSON.stringify(srcCell.style));
+      }
+      if (sourceRow.height) targetRow.height = sourceRow.height;
+    }
+
+    async function exportUpdatedExcel() {
+      if (!state.targetArrayBuffer) {
+        showToast('反映先のExcelファイルが読み込まれていません。', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-export-excel');
+      if (btn) btn.disabled = true;
+
+      try {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(state.targetArrayBuffer.slice(0));
+        const ws = wb.getWorksheet(state.targetSheetName);
+
+        if (state.clearedColumns.length > 0) {
+          state.clearedColumns.forEach(colNum => {
+            for (let r = state.targetDataStartRow; r <= ws.rowCount; r++) {
+              const cell = ws.getRow(r).getCell(colNum);
+              if (!isCellFormula(cell)) cell.value = null;
+            }
+          });
+        }
+
+        if (state.layoutMode === 'vertical') {
+          const valCol = state.verticalCols.valueCol;
+          state.verticalPlan.forEach(item => {
+            if (item.isFormula || item.status === 'preserved') return;
+            const targetRow = ws.getRow(item.rowNumber);
+            targetRow.getCell(valCol).value = item.value === '' ? null : item.value;
+            targetRow.commit();
+          });
+        } else {
+          const inheritStyle = document.getElementById('inherit-row-style')?.checked ?? true;
+          const maxColNum = Math.max(...state.targetColumns.map(c => c.colNumber), ws.columnCount || 1);
+          const templateStyleRowNum = Math.max(state.targetDataStartRow, state.targetLastDataRow);
+          const templateRow = ws.getRow(templateStyleRowNum);
+
+          state.horizontalPlan.forEach(op => {
+            const targetRow = ws.getRow(op.targetRowNumber);
+            if (op.type === 'add' && inheritStyle && templateStyleRowNum >= state.targetDataStartRow) {
+              copyRowStyle(templateRow, targetRow, maxColNum);
+            }
+            Object.entries(op.values).forEach(([colNumStr, val]) => {
+              const colNum = parseInt(colNumStr, 10);
+              if (!isNaN(colNum)) {
+                const cell = targetRow.getCell(colNum);
+                if (!isCellFormula(cell)) cell.value = val === '' ? null : val;
+              }
+            });
+            targetRow.commit();
+          });
+        }
+
+        const outBuffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([outBuffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+
+        const baseName = state.targetFileName.replace(/\.xlsx$/i, '');
+        const now = new Date();
+        const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const defaultBase = `${baseName}_反映済_${stamp}`;
+
+        const customInput = document.getElementById('export-filename-input');
+        let rawName = customInput ? customInput.value.trim() : '';
+        rawName = rawName.replace(/[\\/:*?"<>|]/g, '_').replace(/\.xlsx$/i, '');
+        const outName = `${rawName || defaultBase}.xlsx`;
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = outName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        showToast(`「${outName}」をダウンロードしました！`, 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Excelファイルの出力中にエラーが発生しました。', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
