@@ -1,0 +1,1880 @@
+<!doctype html>
+<html lang="ja" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f6f5e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ナレジ">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ナレジ 朗読カード</title>
+<style>
+:root{
+  --bg:#f6f5f1;
+  --surface:#ffffff;
+  --ink:#1f2421;
+  --muted:#69716c;
+  --line:#dcdcd4;
+  --accent:#2f6f5e;
+  --accent-ink:#ffffff;
+  --accent-soft:#e3efe9;
+  --danger:#b4412f;
+  --ok:#2f7d3c;
+  --shadow:0 6px 24px rgba(20,30,25,.14);
+  --nav-h:62px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#141816;--surface:#1d2320;--ink:#e8ece9;--muted:#9aa39e;--line:#323a36;
+    --accent:#6fc2a7;--accent-ink:#0e1a15;--accent-soft:#213730;--danger:#ef8a78;--ok:#7fcf8b;
+    --shadow:0 6px 24px rgba(0,0,0,.5);color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141816;--surface:#1d2320;--ink:#e8ece9;--muted:#9aa39e;--line:#323a36;
+  --accent:#6fc2a7;--accent-ink:#0e1a15;--accent-soft:#213730;--danger:#ef8a78;--ok:#7fcf8b;
+  --shadow:0 6px 24px rgba(0,0,0,.5);color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  font-size:16px;line-height:1.6;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
+}
+body.has-tts-bar,body.has-tts-mini{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--tts-h,0px) + 16px)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:default;opacity:.4}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ico{width:20px;height:20px;flex:none}
+.ico.sm{width:17px;height:17px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite}
+
+/* ヘッダー */
+header.top{
+  position:sticky;top:0;z-index:20;
+  background:color-mix(in srgb,var(--bg) 92%,transparent);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  display:flex;align-items:center;gap:10px;
+}
+header.top h1{font-size:1.05rem;margin:0;font-weight:800;letter-spacing:.02em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-pill{
+  display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);
+  border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700;color:var(--muted);white-space:nowrap;
+}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.sync-pill[data-s="ok"] .sync-dot{background:var(--ok)}
+.sync-pill[data-s="busy"] .sync-dot,.sync-pill[data-s="pending"] .sync-dot{background:#d8a227}
+.sync-pill[data-s="error"] .sync-dot{background:var(--danger)}
+
+main{max-width:680px;margin:0 auto;padding:14px 16px}
+section.tab{display:flex;flex-direction:column;gap:12px}
+h2{font-size:1rem;margin:4px 0 0;font-weight:800}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:.82rem;font-weight:700;color:var(--muted)}
+input[type=text],input[type=search],input[type=password],input[type=url],select,textarea{
+  width:100%;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:10px;
+  padding:10px 12px;font-size:16px;font-weight:500;color:var(--ink);
+}
+textarea{resize:vertical;min-height:120px;line-height:1.6}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);
+  background:var(--surface);font-weight:700;font-size:.92rem;white-space:nowrap;
+}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line))}
+.btn.ghost{background:transparent}
+.btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.btn.block{width:100%}
+.ibtn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg);font-weight:700;font-size:.82rem;white-space:nowrap;color:var(--ink);
+}
+.ibtn.ico-only{width:40px;padding:0}
+.ibtn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+/* 学習タブ */
+.filters{display:flex;gap:8px}
+.filters select{flex:0 0 38%}
+.study-meta{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:var(--muted);font-weight:700;gap:8px}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 16px;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-height:240px;touch-action:pan-y;
+}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tag{font-size:.72rem;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 10px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ok-badge{font-size:.72rem;font-weight:800;color:var(--ok)}
+.card-title{font-size:1.28rem;font-weight:800;line-height:1.45;margin:0;word-break:break-word}
+.desc-wrap{position:relative}
+.desc{white-space:pre-wrap;word-break:break-word;font-size:1rem;line-height:1.8}
+.desc.masked{filter:blur(7px);user-select:none;pointer-events:none;min-height:4.5em}
+.desc-mask{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px dashed var(--accent);border-radius:12px;color:var(--accent);font-weight:800;font-size:.95rem;
+}
+.card-actions{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:8px}
+.learn-row{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+.empty{text-align:center;padding:40px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+
+/* 一覧タブ */
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.list li{background:var(--surface);border:1px solid var(--line);border-radius:12px;display:flex;align-items:stretch;overflow:hidden}
+.list .li-main{flex:1;min-width:0;text-align:left;background:none;border:0;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.list .li-title{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .li-sub{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .li-act{display:flex;align-items:center;gap:4px;padding-right:8px}
+.list li.is-cur{border-color:var(--accent)}
+
+/* 下部ナビ */
+nav.bottom{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:0 8px env(safe-area-inset-bottom);display:grid;grid-template-columns:repeat(4,1fr);
+}
+nav.bottom button{
+  height:var(--nav-h);background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:.72rem;font-weight:700;color:var(--muted);
+}
+nav.bottom button.on{color:var(--accent)}
+
+/* 朗読パネル */
+.tts-bar{
+  position:fixed;left:0;right:0;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));z-index:25;
+  max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-bottom:0;
+  border-radius:18px 18px 0 0;box-shadow:var(--shadow);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;
+  max-height:calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom) - 70px);overflow-y:auto;
+}
+.tts-head{display:flex;align-items:flex-start;gap:8px}
+.tts-head-text{flex:1;min-width:0}
+.tts-title{font-weight:800;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tts-status{font-size:.8rem;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:6px}
+.tts-ctrl{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px}
+.tts-ctrl .btn{padding:0 8px}
+.tts-sub{display:flex;gap:8px;justify-content:space-between}
+.tts-sub .ibtn{flex:1}
+.tts-more{display:flex;flex-direction:column;gap:8px}
+.tts-hint{font-size:.72rem;color:var(--muted);text-align:center}
+.tts-pause-box,.tts-sec-box{
+  display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+}
+.tts-pause-head,.tts-sec-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:700;color:var(--muted);
+}
+.tts-pause-val,.tts-sec-pos{color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+.tts-sec-meta{display:flex;align-items:center;gap:6px;flex:none}
+.tts-sec-reset{
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:2px 9px;
+  font-size:.72rem;font-weight:700;line-height:1.5;white-space:nowrap;
+}
+.tts-sec-reset:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.tts-sec-row{display:flex;align-items:center;gap:6px}
+.tts-sec-row .ibtn{height:36px;width:36px;min-width:36px;min-height:36px;padding:0}
+.tts-sec-row select{flex:1;min-width:0;height:36px;padding:0 9px;font-size:.82rem;font-weight:500;background:var(--bg);border-radius:9px}
+.tts-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px}
+.tts-seg button{min-height:34px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:.78rem;font-weight:700}
+.tts-seg button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.tts-mini{
+  position:fixed;left:8px;right:8px;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 8px);z-index:25;
+  max-width:664px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:8px;padding:8px 8px 8px 12px;
+}
+.tts-mini-text{flex:1;min-width:0;background:none;border:0;text-align:left;padding:0}
+.tts-mini-title{font-weight:800;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tts-mini-status{font-size:.72rem;color:var(--muted);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* トースト・ダイアログ */
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);z-index:60;
+  background:#222a26;color:#fff;border-radius:12px;padding:10px 14px;font-size:.88rem;font-weight:600;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);width:max-content;
+}
+body.has-tts-bar .toast,body.has-tts-mini .toast{bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--tts-h,0px) + 12px)}
+.toast button{background:none;border:0;color:#9fe0c8;font-weight:800;padding:4px;white-space:nowrap}
+.dlg-back{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg{background:var(--surface);border-radius:16px;padding:18px;max-width:420px;width:100%;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.dlg p{margin:0;white-space:pre-wrap}
+.dlg .row{justify-content:flex-end}
+details.help summary{cursor:pointer;font-weight:700;font-size:.88rem;color:var(--accent)}
+details.help ol{margin:8px 0 0;padding-left:1.3em;font-size:.85rem;display:flex;flex-direction:column;gap:4px}
+code{font-size:.85em;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:0 4px;word-break:break-all}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;font-size:.9rem}
+.switch input{width:22px;height:22px;accent-color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 id="app-title">ナレジ 朗読カード</h1>
+  <button class="sync-pill" id="sync-pill" type="button" data-s="off" title="同期の状態"><span class="sync-dot"></span><span id="sync-pill-text">同期オフ</span></button>
+</header>
+
+<main>
+  <!-- 学習タブ -->
+  <section class="tab" id="tab-study">
+    <div class="filters">
+      <select id="cat-filter" aria-label="カテゴリで絞り込む"></select>
+      <input type="search" id="q" placeholder="カードを検索" aria-label="カードを検索" autocomplete="off">
+    </div>
+    <div class="study-meta">
+      <span id="study-pos">0 / 0</span>
+      <span id="study-progress">覚えた 0 / 0</span>
+    </div>
+
+    <div class="empty panel" id="study-empty" hidden>
+      <div id="study-empty-text">カードがまだありません。</div>
+      <button class="btn primary" id="go-add" type="button">カードを追加する</button>
+    </div>
+
+    <article class="card" id="card" hidden>
+      <div class="card-top">
+        <span class="tag" id="card-cat"></span>
+        <span class="ok-badge" id="card-ok" hidden>✓ 覚えた</span>
+      </div>
+      <h2 class="card-title" id="card-title"></h2>
+      <div class="desc-wrap">
+        <div class="desc" id="desc"></div>
+        <button class="desc-mask" id="desc-mask" type="button" hidden>タップして答えを表示</button>
+      </div>
+    </article>
+
+    <div class="card-actions" id="card-actions" hidden>
+      <button class="btn" id="prev" type="button" aria-label="前のカード"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg><span>前へ</span></button>
+      <button class="btn primary" id="speak" type="button"></button>
+      <button class="btn" id="next" type="button" aria-label="次のカード"><span>次へ</span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+    <div class="learn-row" id="learn-row" hidden>
+      <button class="btn" id="learn-ng" type="button">まだ ✗ 次へ</button>
+      <button class="btn primary" id="learn-ok" type="button">覚えた ✓ 次へ</button>
+    </div>
+    <div class="row wrap" id="study-tools" hidden>
+      <button class="ibtn" id="study-mode" type="button" aria-pressed="false">学習モード（答えを隠す）</button>
+      <button class="ibtn" id="only-new" type="button" aria-pressed="false">未習得だけ</button>
+      <button class="ibtn" id="edit-cur" type="button">編集</button>
+    </div>
+  </section>
+
+  <!-- 一覧タブ -->
+  <section class="tab" id="tab-list" hidden>
+    <input type="search" id="lq" placeholder="一覧を検索" aria-label="一覧を検索" autocomplete="off">
+    <div class="muted small" id="list-count"></div>
+    <ul class="list" id="list"></ul>
+  </section>
+
+  <!-- 追加タブ -->
+  <section class="tab" id="tab-add" hidden>
+    <div class="panel">
+      <h2 id="add-head">カードを追加</h2>
+      <label class="fld">見出し（表）<input type="text" id="a-f" placeholder="例：光合成とは" autocomplete="off"></label>
+      <label class="fld">本文（裏・朗読される内容）<textarea id="a-b" placeholder="段落ごとに改行すると、段落の合間に間があきます"></textarea></label>
+      <label class="fld">カテゴリ<input type="text" id="a-c" list="cat-list" autocomplete="off"></label>
+      <datalist id="cat-list"></datalist>
+      <div class="row">
+        <button class="btn ghost grow" id="a-cancel" type="button" hidden>編集をやめる</button>
+        <button class="btn primary grow" id="a-save" type="button">追加する</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>まとめて追加</h2>
+      <p class="muted small" style="margin:0">1行目が見出し、2行目からが本文です。カードの区切りには「---」だけの行を入れてください。スプレッドシートからコピーした「見出し（タブ）本文」の形式も使えます。</p>
+      <textarea id="bulk-text" placeholder="光合成とは&#10;植物が光のエネルギーで…&#10;---&#10;呼吸とは&#10;…"></textarea>
+      <label class="fld">カテゴリ<input type="text" id="bulk-c" list="cat-list" autocomplete="off"></label>
+      <button class="btn primary" id="bulk-add" type="button">まとめて追加する</button>
+    </div>
+  </section>
+
+  <!-- 設定タブ -->
+  <section class="tab" id="tab-settings" hidden>
+    <div class="panel">
+      <h2>Gemini 音声</h2>
+      <label class="fld">Gemini APIキー（この端末にだけ保存）
+        <div class="row">
+          <input type="password" id="s-key" autocomplete="off" spellcheck="false" placeholder="AIza…">
+          <button class="ibtn" id="s-key-show" type="button">表示</button>
+        </div>
+      </label>
+      <details class="help">
+        <summary>APIキーの取り方</summary>
+        <ol>
+          <li>スマホのブラウザで <code>aistudio.google.com/apikey</code> を開き、Googleアカウントでログインします。</li>
+          <li>「APIキーを作成」を押し、表示されたキーをコピーします。</li>
+          <li>上の欄に貼り付けて「保存して試し聴き」を押します。声が出れば完了です。</li>
+        </ol>
+      </details>
+      <label class="fld">声
+        <select id="s-voice"></select>
+      </label>
+      <label class="fld">読み方の指示（空欄でもOK）
+        <input type="text" id="s-style" placeholder="例：落ち着いた声で、ゆっくりはっきりと" autocomplete="off">
+      </label>
+      <label class="fld">音声モデル
+        <select id="s-model"></select>
+      </label>
+      <label class="fld">読む速さ <span id="s-rate-val"></span>
+        <input type="range" id="s-rate" min="0.7" max="1.6" step="0.05">
+      </label>
+      <label class="switch">朗読が終わったら次のカードへ進む<input type="checkbox" id="s-autonext"></label>
+      <button class="btn primary" id="s-test" type="button">保存して試し聴き</button>
+    </div>
+
+    <div class="panel">
+      <h2>同期（スマホ・パソコン間）</h2>
+      <label class="fld">同期用 Apps Script のURL
+        <input type="url" id="s-sync-url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="fld">合言葉（Apps Script に書いたものと同じ）
+        <input type="password" id="s-sync-key" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="row">
+        <button class="btn grow" id="s-sync-save" type="button">保存</button>
+        <button class="btn primary grow" id="s-sync-now" type="button">今すぐ同期</button>
+      </div>
+      <div class="muted small" id="sync-state">同期は設定されていません</div>
+      <details class="help">
+        <summary>同期の設定方法</summary>
+        <ol>
+          <li>パソコンで <code>script.google.com</code> を開き「新しいプロジェクト」を作ります。</li>
+          <li>中身をすべて消し、配布した <code>narreji-sync.gs</code> の内容を貼り付けます。</li>
+          <li>先頭の <code>SYNC_KEY</code> の「ここに合言葉を書く」を、好きな合言葉（12文字以上推奨）に書き換えて保存します。</li>
+          <li>「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」。実行ユーザー「自分」、アクセスできるユーザー「全員」でデプロイし、承認します。</li>
+          <li>表示された「ウェブアプリのURL」と合言葉を、上の欄に入れて「今すぐ同期」を押します。</li>
+          <li>ほかの端末でも同じURLと合言葉を入れると、カードと朗読設定が同期されます。</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h2>表示</h2>
+      <label class="fld">テーマ
+        <select id="s-theme">
+          <option value="auto">端末に合わせる</option>
+          <option value="light">ライト</option>
+          <option value="dark">ダーク</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="panel">
+      <h2>データ</h2>
+      <div class="row wrap">
+        <button class="btn grow" id="export" type="button">バックアップを書き出す</button>
+        <button class="btn grow" id="import" type="button">バックアップを読み込む</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <button class="btn danger" id="clear-all-data" type="button">すべてのカードを消去</button>
+      <div class="muted small" id="app-ver"></div>
+    </div>
+  </section>
+</main>
+
+<!-- 朗読パネル -->
+<div class="tts-bar" id="tts-bar" hidden role="region" aria-label="朗読パネル">
+  <div class="tts-head">
+    <div class="tts-head-text">
+      <div class="tts-title" id="tts-title">朗読</div>
+      <div class="tts-status" id="tts-status"><span id="tts-status-text">Gemini 朗読（待機中）</span></div>
+    </div>
+    <button class="ibtn ico-only" id="tts-close" type="button" aria-label="パネルを閉じる" title="パネルを閉じる"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+  </div>
+  <div class="tts-ctrl">
+    <button class="btn" id="tts-prev" type="button" title="前の項目を朗読"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg><span>前の項目</span></button>
+    <button class="btn primary" id="tts-play" type="button"></button>
+    <button class="btn" id="tts-next" type="button" title="次の項目を朗読"><span>次の項目</span><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+  </div>
+  <div class="tts-sub">
+    <button class="ibtn" id="tts-stop" type="button"><svg class="ico sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span>停止</span></button>
+    <button class="ibtn" id="tts-test" type="button" title="選んだ声で短いサンプルを再生"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><span>試し聴き</span></button>
+    <button class="ibtn" id="tts-more-btn" type="button" aria-expanded="false" aria-controls="tts-more"><span>間・速さ</span><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+  </div>
+  <!-- 読み始める節の選択・途中再開 -->
+  <div class="tts-sec-box" id="tts-sec-box" hidden>
+    <div class="tts-sec-head">
+      <span id="tts-sec-label">読み始める節</span>
+      <div class="tts-sec-meta">
+        <span class="tts-sec-pos" id="tts-sec-pos" aria-live="polite">1 / 1節</span>
+        <button class="tts-sec-reset" id="tts-sec-reset" type="button" title="第1節に戻す">最初から</button>
+      </div>
+    </div>
+    <div class="tts-sec-row">
+      <button class="ibtn ico-only" id="tts-sec-prev" type="button" aria-label="前の節" title="前の節"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <select id="tts-sec-select" aria-label="読み始める節を選ぶ"></select>
+      <button class="ibtn ico-only" id="tts-sec-next" type="button" aria-label="次の節" title="次の節"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+  </div>
+  <div class="tts-more" id="tts-more" hidden>
+  <!-- 段落の合間（ポーズ時間）を決めるボタン -->
+  <div class="tts-pause-box">
+    <div class="tts-pause-head"><span>段落の合間</span><span class="tts-pause-val" id="tts-pause-val">1秒</span></div>
+    <div class="tts-seg" id="tts-pause-btns">
+      <button type="button" data-v="0">なし</button>
+      <button type="button" data-v="0.5">0.5秒</button>
+      <button type="button" data-v="1">1秒</button>
+      <button type="button" data-v="2">2秒</button>
+      <button type="button" data-v="3">3秒</button>
+    </div>
+  </div>
+  <div class="tts-pause-box">
+    <div class="tts-pause-head"><span>読む速さ</span><span class="tts-pause-val" id="tts-rate-val">1.0倍</span></div>
+    <div class="tts-seg" id="tts-rate-btns">
+      <button type="button" data-v="0.8">0.8</button>
+      <button type="button" data-v="1">1.0</button>
+      <button type="button" data-v="1.2">1.2</button>
+      <button type="button" data-v="1.4">1.4</button>
+      <button type="button" data-v="1.6">1.6</button>
+    </div>
+  </div>
+  </div>
+  <div class="tts-hint" id="tts-hint">Gemini AI音声・バックグラウンド再生対応</div>
+</div>
+
+<!-- 朗読ミニバー（パネルを閉じても朗読中のとき） -->
+<div class="tts-mini" id="tts-mini" hidden>
+  <button class="tts-mini-text" id="tts-mini-open" type="button" aria-label="朗読パネルを開く">
+    <div class="tts-mini-title" id="tts-mini-title"></div>
+    <div class="tts-mini-status" id="tts-mini-status"></div>
+  </button>
+  <button class="ibtn ico-only" id="tts-mini-play" type="button" aria-label="一時停止・再開"></button>
+  <button class="ibtn ico-only" id="tts-mini-stop" type="button" aria-label="朗読を停止"><svg class="ico sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+</div>
+
+<nav class="bottom" id="nav">
+  <button type="button" data-tab="study" class="on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/></svg>学習</button>
+  <button type="button" data-tab="list"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>一覧</button>
+  <button type="button" data-tab="add"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>追加</button>
+  <button type="button" data-tab="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>設定</button>
+</nav>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"><span id="toast-text"></span><button type="button" id="toast-act" hidden></button></div>
+<div class="dlg-back" id="dlg" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-text">
+    <p id="dlg-text"></p>
+    <div class="row">
+      <button class="btn ghost" id="dlg-cancel" type="button">キャンセル</button>
+      <button class="btn primary" id="dlg-ok" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
+<audio id="tts-audio" preload="auto" playsinline></audio>
+
+<script>
+"use strict";
+/* =========================================================
+   ナレジ 朗読カード
+   ・カードの表（見出し）と裏（本文）を Gemini の声で朗読
+   ・読み始める節の選択／途中から再開／段落の合間
+   ・Gemini が使えないときは端末の音声で読み上げ
+   ・Google Apps Script 経由でスマホ・パソコン間を同期
+   ========================================================= */
+const APP_VER="2026.11.27";
+const $=id=>document.getElementById(id);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+const now=()=>Date.now();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+const ICO={
+  play:'<svg class="ico sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>',
+  pause:'<svg class="ico sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>',
+  stop:'<svg class="ico sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  loader:'<svg class="ico sm spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+  volume:'<svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>'
+};
+
+/* ---------- 保存 ---------- */
+const LS={cards:"narreji.v1.cards",prefs:"narreji.v1.prefs",local:"narreji.v1.local"};
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){
+  try{localStorage.setItem(k,JSON.stringify(v));return true}
+  catch(e){toast("端末への保存に失敗しました（空き容量を確認してください）");return false}
+}
+
+const TTS_MODELS=[
+  {id:"gemini-3.1-flash-tts-preview",name:"Gemini 3.1 Flash TTS（おすすめ）"},
+  {id:"gemini-2.5-flash-preview-tts",name:"Gemini 2.5 Flash TTS"},
+  {id:"gemini-2.5-pro-preview-tts",name:"Gemini 2.5 Pro TTS（高品質・遅め）"}
+];
+const TTS_VOICES=[
+  ["Kore","Kore（しっかり・女性的）"],["Aoede","Aoede（明るく軽やか）"],["Leda","Leda（若々しい）"],
+  ["Callirrhoe","Callirrhoe（おだやか）"],["Autonoe","Autonoe（明るい）"],["Despina","Despina（なめらか）"],
+  ["Erinome","Erinome（はっきり）"],["Laomedeia","Laomedeia（弾む）"],["Achernar","Achernar（やわらか）"],
+  ["Gacrux","Gacrux（落ち着いた大人）"],["Pulcherrima","Pulcherrima（前向き）"],["Vindemiatrix","Vindemiatrix（やさしい）"],
+  ["Sulafat","Sulafat（あたたかい）"],["Zephyr","Zephyr（明るい）"],
+  ["Puck","Puck（元気・男性的）"],["Charon","Charon（説明向き）"],["Fenrir","Fenrir（勢いがある）"],
+  ["Orus","Orus（しっかり）"],["Enceladus","Enceladus（息まじり）"],["Iapetus","Iapetus（くっきり）"],
+  ["Umbriel","Umbriel（気さく）"],["Algieba","Algieba（なめらか）"],["Algenib","Algenib（低め）"],
+  ["Rasalgethi","Rasalgethi（知的）"],["Alnilam","Alnilam（力強い）"],["Schedar","Schedar（均一）"],
+  ["Achird","Achird（親しみやすい）"],["Zubenelgenubi","Zubenelgenubi（くだけた）"],
+  ["Sadachbia","Sadachbia（生き生き）"],["Sadaltager","Sadaltager（物知り）"]
+];
+const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",u:0};
+const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:""};
+
+const state={
+  cards:sanitizeCards(lsGet(LS.cards,[])),        // 削除したカードは {id,del:1,u} として残し、同期で他端末にも伝える
+  prefs:{...DEFAULT_PREFS,...lsGet(LS.prefs,{})}, // 同期する設定（APIキーは含めない）
+  opts:{...DEFAULT_OPTS,...lsGet(LS.local,{})}    // この端末だけの設定
+};
+if(!state.opts.ttsPos||typeof state.opts.ttsPos!=="object")state.opts.ttsPos={};
+
+function sanitizeCards(arr){
+  if(!Array.isArray(arr))return [];
+  const out=[],seen=new Set();
+  for(const c of arr){
+    if(!c||typeof c!=="object"||!c.id||seen.has(String(c.id)))continue;
+    const id=String(c.id);seen.add(id);
+    if(c.del){out.push({id,del:1,u:Number(c.u)||0,cr:Number(c.cr)||0});continue}
+    out.push({
+      id,
+      f:String(c.f||"").slice(0,500),
+      b:String(c.b||"").slice(0,20000),
+      c:String(c.c||"").slice(0,60),
+      ok:!!c.ok,
+      cr:Number(c.cr)||Number(c.u)||0,
+      u:Number(c.u)||0
+    });
+  }
+  return out;
+}
+function save(){lsSet(LS.cards,state.cards);scheduleSync()}
+function savePrefs(){state.prefs.u=now();lsSet(LS.prefs,state.prefs);scheduleSync()}
+function saveOpts(){lsSet(LS.local,state.opts)}
+
+const liveCards=()=>state.cards.filter(c=>!c.del);
+const byId=id=>id?state.cards.find(c=>c.id===id&&!c.del)||null:null;
+const categories=()=>[...new Set(liveCards().map(c=>c.c).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ja"));
+
+/* ---------- 表示状態 ---------- */
+const view={order:[],idx:0,revealed:false,studyMask:!!state.opts.studyMask,q:state.opts.q||"",lq:state.opts.lq||""};
+function buildOrder(){
+  const keepId=view.order[view.idx]||state.opts.curId;
+  const q=view.q.trim().toLowerCase();
+  const cat=state.opts.cat;
+  view.order=liveCards()
+    .filter(c=>!cat||c.c===cat)
+    .filter(c=>!state.opts.onlyNew||!c.ok)
+    .filter(c=>!q||(c.f+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q))
+    .sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1))
+    .map(c=>c.id);
+  const i=keepId?view.order.indexOf(keepId):-1;
+  view.idx=i>=0?i:Math.min(view.idx,Math.max(0,view.order.length-1));
+}
+const cur=()=>byId(view.order[view.idx]);
+function select(i,keepTts){
+  if(!view.order.length)return;
+  const ni=Math.max(0,Math.min(view.order.length-1,i));
+  if(ni!==view.idx)view.revealed=false;
+  view.idx=ni;
+  state.opts.curId=view.order[ni]||null;
+  saveOpts();
+  renderCard();
+  if(!keepTts)renderList();
+}
+
+/* ---------- 共通UI ---------- */
+let toastTimer=null;
+function toast(msg,actLabel,actFn,ms){
+  const t=$("toast"),a=$("toast-act");
+  $("toast-text").textContent=msg;
+  if(actLabel){a.hidden=false;a.textContent=actLabel;a.onclick=()=>{t.hidden=true;actFn&&actFn()}}
+  else{a.hidden=true;a.onclick=null}
+  t.hidden=false;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.hidden=true},ms||(actLabel?6000:3200));
+}
+function ask(msg,okLabel,onOk,danger){
+  $("dlg-text").textContent=msg;
+  const ok=$("dlg-ok");
+  ok.textContent=okLabel||"OK";
+  ok.className="btn "+(danger?"danger":"primary");
+  $("dlg").hidden=false;
+  const close=()=>{$("dlg").hidden=true;ok.onclick=null;$("dlg-cancel").onclick=null};
+  ok.onclick=()=>{close();onOk&&onOk()};
+  $("dlg-cancel").onclick=close;
+}
+$("dlg").addEventListener("click",e=>{if(e.target===$("dlg"))$("dlg").hidden=true});
+
+function applyTheme(){document.documentElement.setAttribute("data-theme",state.prefs.theme||"auto")}
+
+function tab(name){
+  if(!["study","list","add","settings"].includes(name))name="study";
+  for(const t of ["study","list","add","settings"])$("tab-"+t).hidden=t!==name;
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
+  state.opts.tab=name;saveOpts();
+  if(name==="list")renderList();
+  if(name==="settings")applySettingsUI();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
+
+/* ---------- 学習タブ ---------- */
+function renderFilters(){
+  const sel=$("cat-filter"),cats=categories();
+  const curCat=state.opts.cat;
+  sel.innerHTML="";
+  const all=document.createElement("option");all.value="";all.textContent=`すべて（${liveCards().length}）`;sel.append(all);
+  for(const c of cats){
+    const o=document.createElement("option");o.value=c;
+    o.textContent=`${c}（${liveCards().filter(x=>x.c===c).length}）`;sel.append(o);
+  }
+  if(curCat&&!cats.includes(curCat)){state.opts.cat="";saveOpts()}
+  sel.value=state.opts.cat;
+  const dl=$("cat-list");dl.innerHTML="";
+  for(const c of cats){const o=document.createElement("option");o.value=c;dl.append(o)}
+}
+$("cat-filter").onchange=e=>{state.opts.cat=e.target.value;saveOpts();view.revealed=false;buildOrder();renderCard()};
+let qTimer=null;
+$("q").oninput=e=>{clearTimeout(qTimer);qTimer=setTimeout(()=>{view.q=e.target.value;state.opts.q=view.q;saveOpts();buildOrder();renderCard()},200)};
+
+/* 学習モードで答え（裏面）を伏せているか */
+function ttsHideAns(c){return !!(c&&c.b&&view.studyMask&&!view.revealed)}
+
+function updateStudyMask(){
+  const c=cur();
+  const masked=ttsHideAns(c);
+  $("desc").classList.toggle("masked",masked);
+  $("desc-mask").hidden=!masked;
+  $("study-mode").classList.toggle("active",view.studyMask);
+  $("study-mode").setAttribute("aria-pressed",String(view.studyMask));
+  $("only-new").classList.toggle("active",!!state.opts.onlyNew);
+  $("only-new").setAttribute("aria-pressed",String(!!state.opts.onlyNew));
+  $("learn-row").hidden=!(c&&view.studyMask&&!masked);
+  if(c){$("learn-ok").textContent=c.ok?"覚えた ✓（済）次へ":"覚えた ✓ 次へ"}
+  renderTtsSections();
+  syncSpeakBtn();
+}
+function renderCard(){
+  renderFilters();
+  const c=cur();
+  const live=liveCards();
+  const okN=live.filter(x=>x.ok).length;
+  $("study-progress").textContent=`覚えた ${okN} / ${live.length}`;
+  $("study-pos").textContent=view.order.length?`${view.idx+1} / ${view.order.length}`:"0 / 0";
+  const has=!!c;
+  $("card").hidden=!has;
+  $("card-actions").hidden=!has;
+  $("study-tools").hidden=!live.length;
+  $("study-empty").hidden=has;
+  if(!has){
+    $("study-empty-text").textContent=live.length?"条件に合うカードがありません。絞り込みを変えてください。":"カードがまだありません。";
+    $("go-add").hidden=!!live.length;
+    $("learn-row").hidden=true;
+    renderTtsSections();
+    syncSpeakBtn();
+    return;
+  }
+  $("card-cat").textContent=c.c||"未分類";
+  $("card-ok").hidden=!c.ok;
+  $("card-title").textContent=c.f||"（見出しなし）";
+  $("desc").textContent=c.b||"";
+  $("prev").disabled=view.idx<=0;
+  $("next").disabled=view.idx>=view.order.length-1;
+  updateStudyMask(); // ここで renderTtsSections() / syncSpeakBtn() も実行される
+}
+$("prev").onclick=()=>select(view.idx-1);
+$("next").onclick=()=>select(view.idx+1);
+$("desc-mask").onclick=()=>{view.revealed=true;updateStudyMask()};
+$("study-mode").onclick=()=>{
+  view.studyMask=!view.studyMask;view.revealed=false;
+  state.opts.studyMask=view.studyMask;saveOpts();updateStudyMask();
+};
+$("only-new").onclick=()=>{state.opts.onlyNew=!state.opts.onlyNew;saveOpts();buildOrder();renderCard()};
+function markLearn(ok){
+  const c=cur();if(!c)return;
+  if(c.ok!==ok){c.ok=ok;c.u=now();save()}
+  const atEnd=view.idx>=view.order.length-1;
+  if(state.opts.onlyNew&&ok){
+    const keepIdx=view.idx;buildOrder();view.idx=Math.min(keepIdx,Math.max(0,view.order.length-1));view.revealed=false;renderCard();
+  }else if(!atEnd){select(view.idx+1)}else{renderCard();toast("最後のカードです")}
+}
+$("learn-ok").onclick=()=>markLearn(true);
+$("learn-ng").onclick=()=>markLearn(false);
+$("edit-cur").onclick=()=>{const c=cur();if(c)startEdit(c.id)};
+$("go-add").onclick=()=>tab("add");
+$("speak").onclick=()=>{
+  const c=cur();if(!c)return;
+  if(tts.active&&tts.cardId===c.id){
+    if(tts.mode==="paused")togglePauseSpeak();
+    else stopSpeak();
+    return;
+  }
+  startGeminiSpeak({card:c});
+};
+/* スワイプで前後のカードへ */
+(()=>{
+  let sx=0,sy=0,st=0;
+  const el=$("card");
+  el.addEventListener("touchstart",e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY;st=now()},{passive:true});
+  el.addEventListener("touchend",e=>{
+    const t=e.changedTouches[0];const dx=t.clientX-sx,dy=t.clientY-sy;
+    if(now()-st<600&&Math.abs(dx)>60&&Math.abs(dy)<45){dx<0?select(view.idx+1):select(view.idx-1)}
+  },{passive:true});
+})();
+
+/* ---------- 一覧タブ ---------- */
+function renderList(){
+  if($("tab-list").hidden)return;
+  const ul=$("list");ul.innerHTML="";
+  const q=view.lq.trim().toLowerCase();
+  const items=liveCards().filter(c=>!q||(c.f+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q)).sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1));
+  $("list-count").textContent=items.length?`${items.length}件`:(liveCards().length?"見つかりませんでした":"カードがまだありません");
+  const curId=view.order[view.idx];
+  for(const c of items){
+    const li=document.createElement("li");
+    if(c.id===curId)li.classList.add("is-cur");
+    const main=document.createElement("button");main.type="button";main.className="li-main";
+    const t=document.createElement("span");t.className="li-title";t.textContent=(c.ok?"✓ ":"")+(c.f||"（見出しなし）");
+    const s=document.createElement("span");s.className="li-sub";s.textContent=(c.c?`［${c.c}］`:"")+(c.b||"").replace(/\s+/g," ").slice(0,60);
+    main.append(t,s);
+    main.onclick=()=>openInStudy(c.id);
+    const act=document.createElement("div");act.className="li-act";
+    const ed=document.createElement("button");ed.type="button";ed.className="ibtn";ed.textContent="編集";ed.onclick=()=>startEdit(c.id);
+    const del=document.createElement("button");del.type="button";del.className="ibtn";del.textContent="削除";del.style.color="var(--danger)";
+    del.onclick=()=>ask(`「${c.f||"（見出しなし）"}」を削除しますか？`,"削除する",()=>removeCard(c.id),true);
+    act.append(ed,del);
+    li.append(main,act);ul.append(li);
+  }
+}
+$("lq").oninput=e=>{view.lq=e.target.value;state.opts.lq=view.lq;saveOpts();renderList()};
+function openInStudy(id){
+  buildOrder();
+  if(!view.order.includes(id)){state.opts.cat="";state.opts.onlyNew=false;view.q="";$("q").value="";state.opts.q="";saveOpts();buildOrder()}
+  const i=view.order.indexOf(id);
+  view.revealed=false;
+  if(i>=0){view.idx=i;state.opts.curId=id;saveOpts()}
+  tab("study");renderCard();
+}
+function removeCard(id){
+  const i=state.cards.findIndex(c=>c.id===id&&!c.del);if(i<0)return;
+  if(tts.active&&tts.cardId===id)stopSpeak();
+  if(state.opts.ttsPos&&id in state.opts.ttsPos){delete state.opts.ttsPos[id];saveOpts()}
+  const prev={...state.cards[i]};
+  state.cards[i]={id,del:1,u:now(),cr:prev.cr};
+  save();buildOrder();renderCard();renderList();
+  toast("削除しました","元に戻す",()=>{
+    const j=state.cards.findIndex(c=>c.id===id);
+    if(j>=0){state.cards[j]={...prev,u:now()};save();buildOrder();renderCard();renderList()}
+  });
+}
+
+/* ---------- 追加・編集 ---------- */
+let editingId=null;
+function startEdit(id){
+  const c=byId(id);if(!c)return;
+  editingId=id;
+  $("a-f").value=c.f;$("a-b").value=c.b;$("a-c").value=c.c;
+  $("add-head").textContent="カードを編集";$("a-save").textContent="変更を保存";$("a-cancel").hidden=false;
+  tab("add");
+}
+function endEdit(){
+  editingId=null;
+  $("a-f").value="";$("a-b").value="";
+  $("a-c").value=state.opts.lastCat||"";
+  $("add-head").textContent="カードを追加";$("a-save").textContent="追加する";$("a-cancel").hidden=true;
+}
+$("a-cancel").onclick=()=>{endEdit();tab("study")};
+$("a-save").onclick=()=>{
+  const f=$("a-f").value.trim(),b=$("a-b").value.replace(/\r/g,"").trim(),c=$("a-c").value.trim();
+  if(!f&&!b){toast("見出しか本文を入力してください");return}
+  state.opts.lastCat=c;saveOpts();
+  if(editingId){
+    const card=byId(editingId);
+    if(card){
+      if(tts.active&&tts.cardId===card.id)stopSpeak();
+      if(card.f!==f||card.b!==b){setCardTtsPos(card.id,0,true)}
+      Object.assign(card,{f,b,c,u:now()});
+      save();buildOrder();renderCard();
+      const id=editingId;endEdit();toast("保存しました");openInStudy(id);return;
+    }
+    endEdit();
+  }
+  const t=now();
+  state.cards.push({id:uid(),f,b,c,ok:false,cr:t,u:t});
+  save();buildOrder();renderCard();
+  $("a-f").value="";$("a-b").value="";$("a-f").focus();
+  toast("追加しました");
+};
+function parseBulk(text){
+  const src=String(text||"").replace(/\r/g,"");
+  const out=[];
+  if(!/^\s*---\s*$/m.test(src)&&/\t/.test(src)){
+    for(const line of src.split("\n")){
+      if(!line.trim())continue;
+      const [f,...rest]=line.split("\t");
+      out.push({f:f.trim(),b:rest.join("\n").replace(/\\n/g,"\n").trim()});
+    }
+    return out.filter(x=>x.f||x.b);
+  }
+  for(const block of src.split(/^\s*---\s*$/m)){
+    const lines=block.split("\n");
+    while(lines.length&&!lines[0].trim())lines.shift();
+    if(!lines.length)continue;
+    const f=lines.shift().trim();
+    const b=lines.join("\n").trim();
+    if(f||b)out.push({f,b});
+  }
+  return out;
+}
+$("bulk-add").onclick=()=>{
+  const items=parseBulk($("bulk-text").value);
+  if(!items.length){toast("追加できるカードがありません");return}
+  const c=$("bulk-c").value.trim();
+  state.opts.lastCat=c;saveOpts();
+  let t=now();
+  for(const it of items){state.cards.push({id:uid(),f:it.f,b:it.b,c,ok:false,cr:t,u:t});t++}
+  save();buildOrder();renderCard();
+  $("bulk-text").value="";
+  toast(`${items.length}件のカードを追加しました`);
+};
+
+/* =========================================================
+   朗読（Gemini TTS）
+   ========================================================= */
+const ttsAudio=$("tts-audio");
+const tts={
+  active:false,
+  paused:false,
+  loading:false,
+  mode:"idle",
+  statusText:"Gemini 朗読（待機中）",
+  lastLabel:"",
+  title:"",
+  token:null,
+  ctl:null,
+  cardId:null,
+  hideAns:false,   // 再生開始時点で答えを伏せていたか（節の分け方を固定するため）
+  chunkIdx:0,
+  totalChunks:0,
+  abortPlay:null,
+  audioPlaying:false,
+  fallback:false,
+  pauseWaiters:[]
+};
+const TTS_IDLE_TEXT="Gemini 朗読（待機中）";
+const MAX_CHUNK=280;   // 1回の音声生成で読む最大文字数（長い段落はここで分ける）
+const MERGE_CHUNK=160; // 短い段落どうしは、合わせてこの文字数までなら1節にまとめる
+let lastSecSig="";
+
+function getTtsPrefs(){
+  const p=state.prefs;
+  return {
+    voice:p.voice||"Kore",
+    model:p.model||TTS_MODELS[0].id,
+    style:String(p.style||"").trim(),
+    rate:Math.max(.5,Math.min(2,Number(p.rate)||1)),
+    paraPause:Math.max(0,Math.min(5,Number(p.paraPause)||0)),
+    autoNext:p.autoNext!==false
+  };
+}
+
+/* 文章を「節」に分ける。段落（改行）単位でまとめ、長い段落は文の切れ目で分割する */
+function speakChunks(text){
+  const paras=String(text||"").replace(/\r/g,"").split(/\n+/).map(s=>s.replace(/[ \t　]+/g," ").trim()).filter(Boolean);
+  const pieces=[];
+  for(const p of paras){
+    if(p.length<=MAX_CHUNK){pieces.push({text:p,paraEnd:true});continue}
+    const sents=p.match(/[^。！？!?]*[。！？!?]+[」』）)]*|[^。！？!?]+$/g)||[p];
+    let buf="";
+    const flush=()=>{if(buf){pieces.push({text:buf,paraEnd:false});buf=""}};
+    for(let s of sents){
+      while(s.length>MAX_CHUNK){flush();pieces.push({text:s.slice(0,MAX_CHUNK),paraEnd:false});s=s.slice(MAX_CHUNK)}
+      if(buf&&buf.length+s.length>MAX_CHUNK)flush();
+      buf+=s;
+    }
+    flush();
+    if(pieces.length)pieces[pieces.length-1].paraEnd=true;
+  }
+  // 短い段落は1節にまとめて、Geminiへのリクエスト回数を減らす
+  const chunks=[];
+  for(const pc of pieces){
+    const last=chunks[chunks.length-1];
+    if(last&&last.pauseAfter&&pc.text.length+last.text.length+1<=MERGE_CHUNK){
+      last.text+="\n"+pc.text;last.pauseAfter=pc.paraEnd;
+    }else{
+      chunks.push({text:pc.text,pauseAfter:pc.paraEnd});
+    }
+  }
+  return chunks;
+}
+function getCardSpeakChunks(c,hideAns){
+  if(!c)return [];
+  const front=String(c.f||"").trim();
+  const back=String(c.b||"").trim();
+  // 見出しが句点などで終わっていれば「。」を重ねない
+  const head=!front||/[。．.！？!?]$/.test(front)?front:front+"。";
+  const fullText=hideAns||!back?head:`${head}\n${back}`;
+  if(!fullText)return [];
+  return speakChunks(fullText);
+}
+/* 再生中のカードは再生開始時の分け方、それ以外は現在の表示状態で節を作る */
+function ttsChunksOf(c){
+  if(!c)return [];
+  const hide=tts.active&&tts.cardId===c.id?tts.hideAns:ttsHideAns(c);
+  return getCardSpeakChunks(c,hide);
+}
+function getCardTtsPos(cardId,total){
+  if(!cardId||!total||total<=1)return 0;
+  const map=state.opts&&state.opts.ttsPos;
+  const v=map&&typeof map==="object"?Number(map[cardId]):0;
+  if(!Number.isFinite(v)||v<=0)return 0;
+  return v<total?Math.floor(v):0;
+}
+function setCardTtsPos(cardId,idx,silent){
+  if(!cardId)return;
+  if(!state.opts.ttsPos||typeof state.opts.ttsPos!=="object")state.opts.ttsPos={};
+  const next=Math.max(0,Math.floor(Number(idx)||0));
+  const prev=Number(state.opts.ttsPos[cardId]||0);
+  if(next<=0){
+    if(cardId in state.opts.ttsPos){delete state.opts.ttsPos[cardId];saveOpts()}
+  }else if(prev!==next){
+    state.opts.ttsPos[cardId]=next;
+    saveOpts();
+  }
+  if(!silent){renderTtsSections();syncSpeakBtn()}
+}
+function ttsTargetCard(){
+  if(tts.active&&tts.cardId){
+    const playing=byId(tts.cardId);
+    if(playing)return playing;
+  }
+  return cur();
+}
+function chunkPreviewLabel(chunk,idx,total){
+  const one=String(chunk&&chunk.text||"").replace(/\s+/g," ").trim();
+  const short=one.length>24?one.slice(0,24)+"…":one;
+  return `${idx+1}/${total}：${short||"（本文）"}`;
+}
+/* 停止中だけ「朗読をはじめる」ボタンと状態表示を更新する（再生中は setTtsUI が管理） */
+function syncTtsIdleUI(idx,total){
+  if(tts.active)return;
+  const resume=idx>0&&total>1;
+  $("tts-play").innerHTML=ICO.play+(resume?`<span>続きから朗読（${idx+1}/${total}）</span>`:"<span>朗読をはじめる</span>");
+  const c=cur();
+  $("tts-title").textContent=c?(c.f||"（見出しなし）"):"朗読";
+  const text=resume?`第${idx+1}/${total}節で停止中（続きから再開できます）`:TTS_IDLE_TEXT;
+  tts.statusText=text;
+  $("tts-status-text").textContent=text;
+}
+function renderTtsSections(){
+  const box=$("tts-sec-box"),sel=$("tts-sec-select");
+  const pos=$("tts-sec-pos"),lbl=$("tts-sec-label");
+  const prevB=$("tts-sec-prev"),nextB=$("tts-sec-next"),resetB=$("tts-sec-reset");
+  const c=ttsTargetCard();
+  const chunks=ttsChunksOf(c);
+  const total=chunks.length;
+  if(!c||!total){
+    box.hidden=true;
+    lastSecSig="";
+    syncTtsIdleUI(0,0);
+    return;
+  }
+  const isPlayingCard=tts.active&&tts.cardId===c.id;
+  const idx=isPlayingCard
+    ?Math.min(Math.max(0,tts.chunkIdx||0),total-1)
+    :getCardTtsPos(c.id,total);
+  box.hidden=false;
+  // 本文の途中だけ編集された場合も選択肢を作り直せるよう、全節の本文で判定する
+  const sig=c.id+"\u0002"+chunks.map(ch=>ch.text).join("\u0001");
+  if(lastSecSig!==sig){
+    lastSecSig=sig;
+    sel.innerHTML="";
+    chunks.forEach((ch,i)=>{
+      const o=document.createElement("option");
+      o.value=String(i);
+      o.textContent=chunkPreviewLabel(ch,i,total);
+      sel.append(o);
+    });
+  }
+  sel.value=String(idx);
+  sel.disabled=total<=1;
+  pos.textContent=`${idx+1} / ${total}節`;
+  lbl.textContent=isPlayingCard?"朗読中の節":(idx>0?"読み始める節（途中から再開）":"読み始める節");
+  prevB.disabled=idx<=0;
+  nextB.disabled=idx>=total-1;
+  resetB.disabled=idx<=0;
+  syncTtsIdleUI(idx,total);
+}
+function jumpTtsSection(idx,isReset){
+  const c=ttsTargetCard();
+  const chunks=ttsChunksOf(c);
+  if(!c||!chunks.length)return;
+  const clamped=Math.max(0,Math.min(chunks.length-1,Math.floor(Number(idx)||0)));
+  if(tts.active&&tts.cardId===c.id){
+    // 再生中：同じ節の分け方のまま、選んだ節から読み直す
+    setCardTtsPos(c.id,clamped,true);
+    startGeminiSpeak({card:c,startIdx:clamped,hideAns:tts.hideAns,keepPanelState:true});
+    return;
+  }
+  setCardTtsPos(c.id,clamped);
+  toast(isReset?"第1節（最初）に戻しました":`第${clamped+1}/${chunks.length}節から読み始めるよう設定しました`);
+}
+function stepTtsSection(delta){
+  const c=ttsTargetCard();
+  const chunks=ttsChunksOf(c);
+  if(!c||!chunks.length)return;
+  const curIdx=tts.active&&tts.cardId===c.id?tts.chunkIdx:getCardTtsPos(c.id,chunks.length);
+  const nextIdx=curIdx+delta;
+  if(nextIdx<0||nextIdx>=chunks.length)return;
+  jumpTtsSection(nextIdx,false);
+}
+
+/* ---------- 音声データ ---------- */
+function base64ToBytes(b64){
+  const bin=atob(b64);
+  const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+  return out;
+}
+/* Gemini が返す PCM（16bit・モノラル）を WAV に包んで再生できる形にする */
+function pcmToWavBlob(pcm,rate){
+  const h=new ArrayBuffer(44),v=new DataView(h);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  w(0,"RIFF");v.setUint32(4,36+pcm.length,true);w(8,"WAVE");
+  w(12,"fmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  w(36,"data");v.setUint32(40,pcm.length,true);
+  return new Blob([h,pcm],{type:"audio/wav"});
+}
+/* 無音（0.5秒）。画面オフやバックグラウンドでも音声セッションを保つために流す */
+const SILENT_URL=URL.createObjectURL(pcmToWavBlob(new Uint8Array(24000),24000));
+
+/* 生成した音声のキャッシュ（同じ文章を何度も生成しない＝無料枠の節約） */
+const memAudio=new Map();
+const AUDIO_DB="narreji-audio",AUDIO_STORE="a",AUDIO_MAX=160;
+let audioDbP=null;
+function audioDb(){
+  if(!audioDbP){
+    audioDbP=new Promise((res,rej)=>{
+      try{
+        const r=indexedDB.open(AUDIO_DB,1);
+        r.onupgradeneeded=()=>{r.result.createObjectStore(AUDIO_STORE,{keyPath:"k"}).createIndex("t","t")};
+        r.onsuccess=()=>res(r.result);
+        r.onerror=()=>rej(r.error);
+      }catch(e){rej(e)}
+    }).catch(()=>null);
+  }
+  return audioDbP;
+}
+async function idbGetAudio(k){
+  const db=await audioDb();if(!db)return null;
+  return new Promise(res=>{
+    try{const q=db.transaction(AUDIO_STORE).objectStore(AUDIO_STORE).get(k);q.onsuccess=()=>res(q.result?q.result.blob:null);q.onerror=()=>res(null)}
+    catch(e){res(null)}
+  });
+}
+async function idbPutAudio(k,blob){
+  const db=await audioDb();if(!db)return;
+  try{
+    const tx=db.transaction(AUDIO_STORE,"readwrite"),st=tx.objectStore(AUDIO_STORE);
+    st.put({k,blob,t:now()});
+    const cnt=st.count();
+    cnt.onsuccess=()=>{
+      let extra=cnt.result-AUDIO_MAX;if(extra<=0)return;
+      st.index("t").openCursor().onsuccess=e=>{const cur=e.target.result;if(cur&&extra>0){cur.delete();extra--;cur.continue()}};
+    };
+  }catch(e){}
+}
+async function clearAudioCache(){
+  memAudio.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}});memAudio.clear();
+  const db=await audioDb();if(!db)return;
+  try{db.transaction(AUDIO_STORE,"readwrite").objectStore(AUDIO_STORE).clear()}catch(e){}
+}
+function memPut(k,url){
+  memAudio.set(k,url);
+  while(memAudio.size>40){
+    const [ok,ou]=memAudio.entries().next().value;
+    if(ttsAudio.src===ou)break;
+    memAudio.delete(ok);try{URL.revokeObjectURL(ou)}catch(e){}
+  }
+}
+function ttsErr(code,msg,extra){return Object.assign(new Error(msg||code),{code},extra||{})}
+function waitAbortable(ms,signal){
+  return new Promise((res,rej)=>{
+    if(signal&&signal.aborted){rej(ttsErr("cancelled"));return}
+    const t=setTimeout(()=>{signal&&signal.removeEventListener("abort",on);res()},ms);
+    const on=()=>{clearTimeout(t);rej(ttsErr("cancelled"))};
+    signal&&signal.addEventListener("abort",on,{once:true});
+  });
+}
+async function requestGeminiTts(model,text,voice,style,key,signal){
+  const prompt=style?`次の文章を、${style}読み上げてください。\n\n${text}`:text;
+  const body={
+    contents:[{parts:[{text:prompt}]}],
+    generationConfig:{
+      responseModalities:["AUDIO"],
+      speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
+    }
+  };
+  for(let attempt=0;;attempt++){
+    let res;
+    try{
+      res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
+        method:"POST",signal,
+        headers:{"Content-Type":"application/json","x-goog-api-key":key},
+        body:JSON.stringify(body)
+      });
+    }catch(e){
+      if(signal&&signal.aborted)throw ttsErr("cancelled");
+      if(attempt<1){await waitAbortable(1500,signal);continue}
+      throw ttsErr("network","通信できませんでした（電波状況を確認してください）");
+    }
+    let j=null;try{j=await res.json()}catch(e){}
+    if(res.ok){
+      const parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[];
+      const part=parts.find(p=>p.inlineData&&p.inlineData.data);
+      if(!part){
+        if(attempt<1){await waitAbortable(800,signal);continue}
+        throw ttsErr("no_audio","Geminiが音声を返しませんでした");
+      }
+      const mime=String(part.inlineData.mimeType||"");
+      const bytes=base64ToBytes(part.inlineData.data);
+      if(/wav|mpeg|mp3|ogg|aac/i.test(mime))return new Blob([bytes],{type:mime});
+      const m=mime.match(/rate=(\d+)/);
+      return pcmToWavBlob(bytes,m?Number(m[1]):24000);
+    }
+    const err=(j&&j.error)||{};
+    const msg=String(err.message||"");
+    if(res.status===404||(res.status===400&&/not found|not supported|is not available|does not support/i.test(msg)))
+      throw ttsErr("model_unavailable",`モデル ${model} は使えません`);
+    if(res.status===401||res.status===403||/API key not valid|API_KEY_INVALID|permission/i.test(msg))
+      throw ttsErr("bad_key","Gemini APIキーが正しくないか、使えない状態です");
+    if(res.status===429){
+      const info=(err.details||[]).find(d=>String(d["@type"]||"").includes("RetryInfo"));
+      const sec=info&&info.retryDelay?parseFloat(info.retryDelay):0;
+      const perDay=/per ?day|PerDay|daily/i.test(JSON.stringify(err));
+      if(!perDay&&attempt<2&&sec<=45){
+        const wait=Math.max(3,Math.ceil(sec||8));
+        if(tts.active)setTtsUI("loading",`Geminiが混み合っています…${wait}秒後に再試行`);
+        await waitAbortable(wait*1000,signal);
+        continue;
+      }
+      throw ttsErr("quota",perDay?"Gemini音声の1日の無料枠を使い切りました":"Gemini音声の利用回数の上限に達しました");
+    }
+    if(res.status>=500&&attempt<2){await waitAbortable(1500*(attempt+1),signal);continue}
+    throw ttsErr("api",`Gemini音声の作成に失敗しました（${res.status}）`);
+  }
+}
+async function fetchGeminiTtsUrl(text,voice,style,signal){
+  const key=String(state.opts.apiKey||"").trim();
+  if(!key)throw ttsErr("no_key","Gemini APIキーが未設定です");
+  const pref=getTtsPrefs().model;
+  const models=[pref,...TTS_MODELS.map(m=>m.id).filter(m=>m!==pref)];
+  let lastErr=null;
+  for(const model of models){
+    const ck=[model,voice,style,text].join("\u0001");
+    if(memAudio.has(ck))return memAudio.get(ck);
+    const cached=await idbGetAudio(ck);
+    if(cached){const u=URL.createObjectURL(cached);memPut(ck,u);return u}
+    try{
+      const blob=await requestGeminiTts(model,text,voice,style,key,signal);
+      if(model!==state.prefs.model){
+        state.prefs.model=model;savePrefs();
+        toast(`音声モデルを「${model}」に切り替えました`);
+      }
+      idbPutAudio(ck,blob);
+      const u=URL.createObjectURL(blob);memPut(ck,u);
+      return u;
+    }catch(e){
+      lastErr=e;
+      if(e.code!=="model_unavailable")throw e;
+    }
+  }
+  throw lastErr||ttsErr("api","Gemini音声を作成できませんでした");
+}
+
+/* ---------- 再生 ---------- */
+function startKeepAliveAudio(){
+  if(tts.audioPlaying)return;
+  try{
+    if(ttsAudio.src!==SILENT_URL){ttsAudio.src=SILENT_URL}
+    ttsAudio.loop=true;
+    ttsAudio.playbackRate=1;
+    const p=ttsAudio.play();if(p&&p.catch)p.catch(()=>{});
+  }catch(e){}
+}
+function stopKeepAliveAudio(){
+  try{if(ttsAudio.src===SILENT_URL){ttsAudio.pause()}ttsAudio.loop=false}catch(e){}
+}
+function waitWhilePaused(token){
+  if(!tts.paused||tts.token!==token)return Promise.resolve();
+  return new Promise(res=>tts.pauseWaiters.push(res));
+}
+function releasePauseWaiters(){const w=tts.pauseWaiters;tts.pauseWaiters=[];w.forEach(f=>f())}
+async function waitParagraphPause(sec,token){
+  startKeepAliveAudio();
+  const end=now()+sec*1000;
+  while(tts.token===token&&now()<end){
+    await sleep(Math.min(200,end-now()));
+    if(tts.paused){await waitWhilePaused(token)}
+  }
+}
+function playUrlOnce(url,rate,token){
+  return new Promise((resolve,reject)=>{
+    if(tts.token!==token){resolve();return}
+    let done=false;
+    const cleanup=()=>{ttsAudio.onended=null;ttsAudio.onerror=null;tts.abortPlay=null;tts.audioPlaying=false};
+    const finish=ok=>{
+      if(done)return;done=true;cleanup();
+      ok?resolve():reject(ttsErr("play_error","音声を再生できませんでした"));
+    };
+    tts.abortPlay=()=>{if(done)return;done=true;cleanup();resolve()};
+    tts.audioPlaying=true;
+    ttsAudio.loop=false;
+    ttsAudio.src=url;
+    ttsAudio.defaultPlaybackRate=rate;
+    ttsAudio.playbackRate=rate;
+    try{ttsAudio.preservesPitch=true;ttsAudio.webkitPreservesPitch=true}catch(e){}
+    ttsAudio.onended=()=>finish(true);
+    ttsAudio.onerror=()=>finish(false);
+    if(tts.paused)return; // 再開ボタンで play() する
+    const p=ttsAudio.play();
+    if(p&&p.catch)p.catch(err=>{
+      if(done||tts.token!==token)return;
+      if(err&&err.name==="NotAllowedError"){
+        // 自動再生がブロックされた（画面オフ直後など）。▶で再開できるよう一時停止にする
+        tts.paused=true;
+        setTtsUI("paused","再生が止められました。▶で再開してください");
+      }else if(!(err&&err.name==="AbortError")){finish(false)}
+    });
+  });
+}
+
+function setTtsUI(mode,text){
+  tts.mode=mode;
+  if(text!=null){tts.statusText=text;if(mode!=="paused")tts.lastLabel=text}
+  $("tts-status-text").textContent=tts.statusText;
+  const play=$("tts-play");
+  if(mode==="idle"){
+    play.innerHTML=ICO.play+"<span>朗読をはじめる</span>";
+  }else if(mode==="paused"){
+    play.innerHTML=ICO.play+"<span>再開</span>";
+  }else if(mode==="loading"){
+    play.innerHTML=ICO.loader+"<span>一時停止</span>";
+  }else{
+    play.innerHTML=ICO.pause+"<span>一時停止</span>";
+  }
+  if(tts.active)$("tts-title").textContent=tts.title||"朗読中";
+  const st=$("tts-status");
+  st.querySelector(".spin")&&st.querySelector(".spin").remove();
+  if(mode==="loading")st.insertAdjacentHTML("afterbegin",ICO.loader);
+  syncSpeakBtn();
+  syncMiniBar();
+  updateMediaSession();
+}
+function syncSpeakBtn(){
+  const btn=$("speak");
+  const c=cur();
+  const sameCard=tts.active&&!!c&&c.id===tts.cardId;
+  btn.classList.toggle("active",sameCard);
+  if(sameCard){
+    btn.title="朗読の操作";
+    btn.innerHTML=tts.mode==="loading"
+      ?ICO.loader+"<span>準備中（停止）</span>"
+      :tts.mode==="paused"
+        ?ICO.play+"<span>朗読を再開</span>"
+        :ICO.stop+"<span>朗読を停止</span>";
+  }else{
+    const chunks=ttsChunksOf(c);
+    const savedIdx=c?getCardTtsPos(c.id,chunks.length):0;
+    if(savedIdx>0&&chunks.length>1){
+      btn.title=`第${savedIdx+1}/${chunks.length}節から続きを朗読`;
+      btn.innerHTML=ICO.play+"<span>続きを朗読</span>";
+    }else{
+      btn.title="Geminiの声で朗読";
+      btn.innerHTML=ICO.volume+"<span>朗読する</span>";
+    }
+  }
+}
+let ttsBarOpen=false;
+function openTtsBar(open){
+  ttsBarOpen=!!open;
+  $("tts-bar").hidden=!ttsBarOpen;
+  syncMiniBar();
+}
+function syncMiniBar(){
+  const showMini=!ttsBarOpen&&tts.active;
+  $("tts-mini").hidden=!showMini;
+  document.body.classList.toggle("has-tts-bar",ttsBarOpen);
+  document.body.classList.toggle("has-tts-mini",showMini);
+  syncTtsInset();
+  if(showMini){
+    $("tts-mini-title").textContent=tts.title||"朗読中";
+    $("tts-mini-status").textContent=tts.statusText;
+    $("tts-mini-play").innerHTML=tts.mode==="paused"?ICO.play:ICO.pause;
+  }
+}
+function updateMediaSession(){
+  if(!("mediaSession" in navigator))return;
+  try{
+    if(!tts.active){navigator.mediaSession.playbackState="none";return}
+    const c=tts.cardId?byId(tts.cardId):null;
+    navigator.mediaSession.metadata=new MediaMetadata({
+      title:tts.title||"朗読中",
+      artist:tts.totalChunks>1?`第${tts.chunkIdx+1}/${tts.totalChunks}節`:"ナレジ 朗読カード",
+      album:c&&c.c?c.c:"ナレジ"
+    });
+    navigator.mediaSession.playbackState=tts.mode==="paused"?"paused":"playing";
+  }catch(e){}
+}
+function initMediaSession(){
+  if(!("mediaSession" in navigator))return;
+  const set=(a,f)=>{try{navigator.mediaSession.setActionHandler(a,f)}catch(e){}};
+  set("play",()=>{if(tts.active&&tts.mode==="paused")togglePauseSpeak();else if(!tts.active)startGeminiSpeak({keepPanelState:true})});
+  set("pause",()=>{if(tts.active&&tts.mode!=="paused")togglePauseSpeak()});
+  set("stop",()=>stopSpeak());
+  set("nexttrack",()=>speakNeighbor(1));
+  set("previoustrack",()=>speakNeighbor(-1));
+}
+
+/* ブラウザ音声フォールバック（Gemini APIが一時利用できない場合） */
+let jaVoice=null;
+function pickJaVoice(){
+  try{
+    const vs=window.speechSynthesis?speechSynthesis.getVoices():[];
+    jaVoice=vs.find(v=>/^ja/i.test(v.lang)&&/Google|Kyoko|O-ren|Otoya|Hattori/i.test(v.name))||vs.find(v=>/^ja/i.test(v.lang))||null;
+  }catch(e){jaVoice=null}
+}
+if(window.speechSynthesis){pickJaVoice();try{speechSynthesis.onvoiceschanged=pickJaVoice}catch(e){}}
+function startFallbackSpeak(chunks,token,rate,noAutoNext,startIdx=0,cardId=null,why=""){
+  const failMsg=(why?why+"。":"")+"端末の音声でも読み上げできませんでした";
+  if(!window.speechSynthesis||!chunks.length){
+    stopSpeak();
+    toast(why?failMsg:"音声を作成できませんでした。時間をおいてお試しください",null,null,6000);
+    return;
+  }
+  tts.fallback=true;
+  tts.loading=false;
+  try{ttsAudio.loop=false;ttsAudio.pause()}catch(e){}
+  $("tts-hint").textContent="一時的に端末の音声で読み上げています";
+  const speakOne=(text,onDone)=>{
+    // 長い文章は途中で切れる端末があるため、文単位で読み上げる
+    const parts=text.match(/[^。！？!?\n]+[。！？!?]*|\n/g)?.map(s=>s.trim()).filter(Boolean)||[text];
+    let k=0;
+    const step=()=>{
+      if(tts.token!==token)return;
+      if(k>=parts.length){onDone();return}
+      const u=new SpeechSynthesisUtterance(parts[k++]);
+      u.lang="ja-JP";u.rate=rate;if(jaVoice)u.voice=jaVoice;
+      u.onend=()=>step();
+      u.onerror=e=>{
+        if(tts.token!==token)return;
+        if(e&&(e.error==="interrupted"||e.error==="canceled"))return;
+        stopSpeak();toast(failMsg,null,null,6000);
+      };
+      speechSynthesis.speak(u);
+    };
+    step();
+  };
+  const next=i=>{
+    if(tts.token!==token)return;
+    if(i>=chunks.length){onCardSpeakFinished(token,noAutoNext);return}
+    tts.chunkIdx=i;
+    if(cardId){setCardTtsPos(cardId,i,true);renderTtsSections()}
+    setTtsUI("playing",chunks.length>1?`端末音声で朗読中（${i+1}/${chunks.length}）`:"端末音声で朗読中");
+    try{
+      speakOne(chunks[i].text,async()=>{
+        if(tts.token!==token)return;
+        if(chunks[i].pauseAfter&&i<chunks.length-1){
+          const pauseSec=getTtsPrefs().paraPause;
+          if(pauseSec>0){
+            setTtsUI("playing",`段落の合間…（${pauseSec}秒）`);
+            await waitParagraphPause(pauseSec,token);
+          }
+        }
+        await waitWhilePaused(token);
+        next(i+1);
+      });
+    }catch(e){stopSpeak()}
+  };
+  try{speechSynthesis.cancel()}catch(e){}
+  next(Math.max(0,Math.min(chunks.length-1,Math.floor(Number(startIdx)||0))));
+}
+
+function stopSpeak(keepBar){
+  tts.token=null;
+  tts.active=false;
+  tts.paused=false;
+  tts.loading=false;
+  tts.fallback=false;
+  tts.cardId=null;
+  tts.hideAns=false;
+  tts.chunkIdx=0;
+  tts.totalChunks=0;
+  tts.title="";
+  releasePauseWaiters();
+  if(tts.abortPlay){try{tts.abortPlay()}catch(e){}tts.abortPlay=null}
+  if(tts.ctl){try{tts.ctl.abort()}catch(e){}tts.ctl=null}
+  try{ttsAudio.loop=false;ttsAudio.pause();ttsAudio.currentTime=0}catch(e){}
+  tts.audioPlaying=false;
+  try{if(window.speechSynthesis)speechSynthesis.cancel()}catch(e){}
+  setTtsUI("idle",TTS_IDLE_TEXT);
+  // 保存済みの節位置があれば「第N節で停止中」と「続きから朗読」に置き換わる
+  renderTtsSections();
+  syncSpeakBtn();
+  $("tts-hint").textContent="Gemini AI音声・バックグラウンド再生対応";
+  if(keepBar===false)openTtsBar(false);
+  else syncMiniBar();
+}
+
+function onCardSpeakFinished(token,noAutoNext){
+  if(tts.token!==token)return;
+  const finishedCardId=tts.cardId;
+  if(finishedCardId)setCardTtsPos(finishedCardId,0,true);
+  const prefs=getTtsPrefs();
+  const curIdx=finishedCardId?view.order.indexOf(finishedCardId):-1;
+  const isLast=curIdx>=0&&curIdx===view.order.length-1;
+  if(!noAutoNext&&prefs.autoNext&&curIdx>=0&&!isLast){
+    const nextIdx=curIdx+1;
+    const nextCard=byId(view.order[nextIdx]);
+    if(nextCard){
+      // 次の項目を選択し、そのカードを明示して最初の節から朗読する
+      view.revealed=false;
+      select(nextIdx,true);
+      startGeminiSpeak({card:nextCard,keepPanelState:true,startIdx:0});
+      return;
+    }
+  }
+  stopSpeak();
+  if(!noAutoNext&&prefs.autoNext&&isLast){
+    toast("最後の項目まで朗読しました");
+  }
+}
+
+async function startGeminiSpeak(opts={}){
+  const isCustom=!!opts.customText;
+  const c=opts.card||(isCustom?null:cur());
+  if(!isCustom&&!c)return;
+  stopSpeak();
+  // クリック直後に無音オーディオでセッションを確保（画面オフ・バックグラウンド移行時の再生維持）
+  startKeepAliveAudio();
+  if(!opts.keepPanelState)openTtsBar(true);
+
+  const prefs=getTtsPrefs();
+  const hideAns=!isCustom&&(typeof opts.hideAns==="boolean"?opts.hideAns:ttsHideAns(c));
+  const chunks=isCustom?speakChunks(opts.customText):getCardSpeakChunks(c,hideAns);
+  if(!chunks.length){stopSpeak();toast("朗読する文章がありません");return}
+
+  let startIdx=0;
+  if(!isCustom){
+    startIdx=typeof opts.startIdx==="number"
+      ?Math.max(0,Math.min(chunks.length-1,Math.floor(opts.startIdx)))
+      :getCardTtsPos(c.id,chunks.length);
+  }
+
+  const token={id:uid()};
+  const ctl=new AbortController();
+  tts.token=token;
+  tts.active=true;
+  tts.paused=false;
+  tts.loading=true;
+  tts.ctl=ctl;
+  tts.cardId=isCustom?null:c.id;
+  tts.hideAns=hideAns;
+  tts.chunkIdx=startIdx;
+  tts.totalChunks=chunks.length;
+  tts.title=opts.title||(isCustom?(opts.label||"朗読中"):(c.f||"（見出しなし）"));
+  if(!isCustom){setCardTtsPos(c.id,startIdx,true);renderTtsSections()}
+
+  // APIキーが無いときは端末の音声で読む
+  if(!String(state.opts.apiKey||"").trim()){
+    toast("設定でGemini APIキーを入れるとGeminiの声になります（今回は端末の音声）","設定へ",()=>tab("settings"));
+    startFallbackSpeak(chunks,token,prefs.rate,!!opts.noAutoNext,startIdx,isCustom?null:c.id);
+    return;
+  }
+  $("tts-hint").textContent=`Gemini 音声（${prefs.voice}）・画面を閉じても継続`;
+
+  try{
+    // 通信待ちを減らすため、1節先まで先読み（無料枠の回数制限に配慮して1つだけ）
+    const prefetches=new Map();
+    const kick=idx=>{
+      if(idx<chunks.length&&!prefetches.has(idx)){
+        prefetches.set(idx,fetchGeminiTtsUrl(chunks[idx].text,prefs.voice,prefs.style,ctl.signal).catch(err=>({__err:err})));
+      }
+    };
+    kick(startIdx);
+
+    for(let i=startIdx;i<chunks.length;i++){
+      if(tts.token!==token)return;
+      tts.chunkIdx=i;
+      if(!isCustom){setCardTtsPos(c.id,i,true);renderTtsSections()}
+      tts.loading=true;
+      startKeepAliveAudio();
+      if(!tts.paused)setTtsUI("loading",chunks.length>1?`Geminiが音声を作成中…（${i+1}/${chunks.length}）`:"Geminiが音声を作成中…");
+
+      kick(i);
+      const res=await prefetches.get(i);
+      prefetches.delete(i);
+      if(tts.token!==token)return;
+      if(res&&res.__err)throw res.__err;
+      const url=res;
+
+      kick(i+1);
+
+      tts.loading=false;
+      await waitWhilePaused(token);
+      if(tts.token!==token)return;
+      const playLabel=opts.label||(chunks.length>1?`Geminiが朗読中（${i+1}/${chunks.length}）`:"Geminiが朗読中");
+      setTtsUI("playing",playLabel);
+      await playUrlOnce(url,getTtsPrefs().rate,token);
+      if(tts.token!==token)return;
+
+      // 段落の切れ目で設定した合間（ポーズ）を入れる
+      if(chunks[i].pauseAfter&&i<chunks.length-1){
+        const pauseSec=getTtsPrefs().paraPause;
+        if(pauseSec>0){
+          setTtsUI("playing",`段落の合間…（${pauseSec}秒）`);
+          await waitParagraphPause(pauseSec,token);
+          if(tts.token!==token)return;
+        }
+      }
+    }
+    onCardSpeakFinished(token,!!opts.noAutoNext);
+  }catch(err){
+    if(tts.token!==token)return;
+    if(err&&(err.code==="cancelled"||err.name==="AbortError"))return;
+    // 先読み中の Gemini リクエストは不要になるので打ち切る
+    try{ctl.abort()}catch(e){}
+    if(tts.ctl===ctl)tts.ctl=null;
+    const resumeFrom=Math.max(startIdx,tts.chunkIdx||0);
+    const why=err&&err.message?err.message:"Gemini音声を取得できませんでした";
+    toast(`${why}。端末の音声に切り替えます`,err&&(err.code==="bad_key"||err.code==="no_key")?"設定へ":null,()=>tab("settings"),6000);
+    startFallbackSpeak(chunks,token,prefs.rate,!!opts.noAutoNext,resumeFrom,isCustom?null:c.id,why);
+  }
+}
+
+function togglePauseSpeak(){
+  if(!tts.active)return;
+  if(tts.paused){
+    tts.paused=false;
+    if(tts.fallback){try{speechSynthesis.resume()}catch(e){}}
+    else if(tts.audioPlaying){const p=ttsAudio.play();if(p&&p.catch)p.catch(()=>{})}
+    else startKeepAliveAudio();
+    setTtsUI(tts.loading?"loading":"playing",tts.lastLabel||"朗読中");
+    releasePauseWaiters();
+  }else{
+    tts.paused=true;
+    if(tts.fallback){try{speechSynthesis.pause()}catch(e){}}
+    try{ttsAudio.pause()}catch(e){}
+    const pos=tts.totalChunks>1?`（${tts.chunkIdx+1}/${tts.totalChunks}）`:"";
+    setTtsUI("paused",`一時停止中${pos}`);
+  }
+}
+/* 前後の項目（カード）を朗読 */
+function speakNeighbor(delta){
+  const baseId=tts.active&&tts.cardId?tts.cardId:view.order[view.idx];
+  const i=view.order.indexOf(baseId);
+  const ni=(i<0?view.idx:i)+delta;
+  if(ni<0||ni>=view.order.length){toast(delta>0?"最後の項目です":"最初の項目です");return}
+  view.revealed=false;
+  select(ni,true);
+  startGeminiSpeak({card:cur(),keepPanelState:true,startIdx:0});
+}
+
+$("tts-play").onclick=()=>{
+  if(!tts.active){
+    const c=cur();
+    if(!c){toast("朗読するカードがありません");return}
+    startGeminiSpeak({card:c,keepPanelState:true});
+  }else togglePauseSpeak();
+};
+$("tts-stop").onclick=()=>stopSpeak();
+$("tts-prev").onclick=()=>speakNeighbor(-1);
+$("tts-next").onclick=()=>speakNeighbor(1);
+$("tts-test").onclick=()=>startGeminiSpeak({customText:"こんにちは。この声でカードを朗読します。",title:"試し聴き",label:"試し聴き中",noAutoNext:true,keepPanelState:true});
+$("tts-close").onclick=()=>{
+  openTtsBar(false);
+  if(tts.active)toast("パネルを閉じました（朗読は継続します）");
+};
+$("tts-mini-open").onclick=()=>openTtsBar(true);
+$("tts-more-btn").onclick=()=>{
+  const m=$("tts-more");m.hidden=!m.hidden;
+  $("tts-more-btn").setAttribute("aria-expanded",String(!m.hidden));
+  $("tts-more-btn").classList.toggle("active",!m.hidden);
+};
+/* 朗読パネルの高さぶん、ページ下に余白を取る（カードのボタンが隠れないように） */
+function syncTtsInset(){
+  const el=ttsBarOpen?$("tts-bar"):(!$("tts-mini").hidden?$("tts-mini"):null);
+  const h=el?Math.ceil(el.getBoundingClientRect().height)+(ttsBarOpen?0:8):0;
+  document.documentElement.style.setProperty("--tts-h",h+"px");
+}
+if(window.ResizeObserver){const ro=new ResizeObserver(syncTtsInset);ro.observe($("tts-bar"));ro.observe($("tts-mini"))}
+$("tts-mini-play").onclick=()=>togglePauseSpeak();
+$("tts-mini-stop").onclick=()=>stopSpeak(false);
+/* 読み始める節の選択・前後移動・最初に戻す */
+$("tts-sec-select").onchange=e=>{jumpTtsSection(Number(e.target.value)||0,false)};
+$("tts-sec-prev").onclick=()=>stepTtsSection(-1);
+$("tts-sec-next").onclick=()=>stepTtsSection(1);
+$("tts-sec-reset").onclick=()=>jumpTtsSection(0,true);
+/* 段落の合間（ポーズ時間）ボタン */
+document.querySelectorAll("#tts-pause-btns button").forEach(btn=>{
+  btn.onclick=()=>{state.prefs.paraPause=Number(btn.dataset.v);savePrefs();applyTtsOptsUI()};
+});
+/* 読む速さボタン */
+document.querySelectorAll("#tts-rate-btns button").forEach(btn=>{
+  btn.onclick=()=>{
+    state.prefs.rate=Number(btn.dataset.v);savePrefs();applyTtsOptsUI();
+    if(tts.active&&!tts.fallback&&ttsAudio.src!==SILENT_URL){ttsAudio.playbackRate=state.prefs.rate}
+  };
+});
+function applyTtsOptsUI(){
+  const p=getTtsPrefs();
+  document.querySelectorAll("#tts-pause-btns button").forEach(b=>b.classList.toggle("on",Number(b.dataset.v)===p.paraPause));
+  $("tts-pause-val").textContent=p.paraPause>0?`${p.paraPause}秒`:"なし";
+  document.querySelectorAll("#tts-rate-btns button").forEach(b=>b.classList.toggle("on",Math.abs(Number(b.dataset.v)-p.rate)<.001));
+  $("tts-rate-val").textContent=`${p.rate.toFixed(2).replace(/0$/,"")}倍`;
+}
+
+/* ---------- 設定タブ ---------- */
+function applySettingsUI(){
+  const p=getTtsPrefs();
+  $("s-key").value=state.opts.apiKey||"";
+  const vs=$("s-voice");
+  if(!vs.options.length)for(const [v,n] of TTS_VOICES){const o=document.createElement("option");o.value=v;o.textContent=n;vs.append(o)}
+  vs.value=p.voice;
+  const ms=$("s-model");
+  if(!ms.options.length)for(const m of TTS_MODELS){const o=document.createElement("option");o.value=m.id;o.textContent=m.name;ms.append(o)}
+  if(![...ms.options].some(o=>o.value===p.model)){const o=document.createElement("option");o.value=p.model;o.textContent=p.model;ms.append(o)}
+  ms.value=p.model;
+  $("s-style").value=state.prefs.style||"";
+  $("s-rate").value=String(p.rate);
+  $("s-rate-val").textContent=`（${p.rate.toFixed(2)}倍）`;
+  $("s-autonext").checked=p.autoNext;
+  $("s-theme").value=state.prefs.theme||"auto";
+  $("s-sync-url").value=state.opts.syncUrl||"";
+  $("s-sync-key").value=state.opts.syncKey||"";
+  $("app-ver").textContent=`バージョン ${APP_VER}・カード ${liveCards().length}件`;
+  renderSyncState();
+}
+function readTtsSettings(){
+  state.opts.apiKey=$("s-key").value.trim();saveOpts();
+  const p=state.prefs;
+  const nv=$("s-voice").value,nm=$("s-model").value,ns=$("s-style").value.trim(),nr=Number($("s-rate").value)||1,na=$("s-autonext").checked;
+  if(p.voice!==nv||p.model!==nm||p.style!==ns||p.rate!==nr||p.autoNext!==na){
+    Object.assign(p,{voice:nv,model:nm,style:ns,rate:nr,autoNext:na});savePrefs();
+  }
+  applyTtsOptsUI();
+}
+$("s-key").onchange=readTtsSettings;
+["s-voice","s-model","s-style","s-autonext"].forEach(id=>$(id).onchange=readTtsSettings);
+$("s-rate").oninput=()=>{$("s-rate-val").textContent=`（${Number($("s-rate").value).toFixed(2)}倍）`};
+$("s-rate").onchange=readTtsSettings;
+$("s-key-show").onclick=()=>{const k=$("s-key");const show=k.type==="password";k.type=show?"text":"password";$("s-key-show").textContent=show?"隠す":"表示"};
+$("s-test").onclick=()=>{
+  readTtsSettings();
+  if(!state.opts.apiKey){toast("APIキーを入力してください");$("s-key").focus();return}
+  openTtsBar(true);
+  startGeminiSpeak({customText:"こんにちは。この声でカードを朗読します。",title:"試し聴き",label:"試し聴き中",noAutoNext:true,keepPanelState:true});
+};
+$("s-theme").onchange=()=>{state.prefs.theme=$("s-theme").value;savePrefs();applyTheme()};
+
+/* ---------- データ ---------- */
+$("export").onclick=()=>{
+  const data={app:"narreji",v:1,exportedAt:new Date().toISOString(),cards:liveCards(),prefs:state.prefs};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  const d=new Date();
+  a.href=URL.createObjectURL(blob);
+  a.download=`narreji-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`;
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+};
+$("import").onclick=()=>$("import-file").click();
+$("import-file").onchange=async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";
+  if(!f)return;
+  let data;
+  try{data=JSON.parse(await f.text())}catch(err){toast("読み込めませんでした（JSON形式ではありません）");return}
+  const incoming=sanitizeCards(Array.isArray(data)?data:data&&data.cards).filter(c=>!c.del);
+  if(!incoming.length){toast("カードが見つかりませんでした");return}
+  ask(`${incoming.length}件のカードを読み込みますか？\n（同じカードは読み込んだ内容で上書きします）`,"読み込む",()=>{
+    const t=now();
+    for(const c of incoming){
+      c.u=t;
+      const i=state.cards.findIndex(x=>x.id===c.id);
+      if(i>=0)state.cards[i]=c;else state.cards.push(c);
+    }
+    save();buildOrder();renderCard();renderList();
+    toast(`${incoming.length}件を読み込みました`);
+  });
+};
+$("clear-all-data").onclick=()=>{
+  const n=liveCards().length;
+  if(!n){toast("消去するカードがありません");return}
+  ask(`登録されているすべてのカード（${n}件）を消去しますか？\n同期している他の端末からも消えます。`,"すべて消去する",()=>{
+    if(tts.active)stopSpeak();
+    const t=now();
+    state.cards=state.cards.map(c=>c.del?c:{id:c.id,del:1,u:t,cr:c.cr});
+    state.opts.ttsPos={};
+    saveOpts();
+    save();
+    clearAudioCache();
+    buildOrder();renderCard();renderList();
+    toast("すべて消去しました");
+  },true);
+};
+
+/* =========================================================
+   同期（Google Apps Script ＋ Googleドライブ）
+   ========================================================= */
+const sync={busy:false,timer:null,again:false,state:"off",msg:""};
+const TOMBSTONE_KEEP=90*24*3600*1000;
+const syncReady=()=>!!(state.opts.syncUrl&&state.opts.syncKey);
+function setSyncState(s,msg){sync.state=s;sync.msg=msg||"";renderSyncState()}
+function renderSyncState(){
+  const pill=$("sync-pill");
+  const s=syncReady()?sync.state:"off";
+  pill.dataset.s=s;
+  const t=state.opts.lastSync?new Date(state.opts.lastSync):null;
+  const hm=t?`${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}`:"";
+  $("sync-pill-text").textContent=s==="off"?"同期オフ":s==="busy"?"同期中…":s==="pending"?"同期待ち":s==="error"?"同期エラー":"同期済み";
+  $("sync-state").textContent=s==="off"
+    ?"同期は設定されていません（この端末だけに保存されます）"
+    :s==="error"?`同期できませんでした：${sync.msg}`:(hm?`最終同期 ${hm}`:"まだ同期していません");
+}
+$("sync-pill").onclick=()=>{if(syncReady())runSync(true);else tab("settings")};
+function scheduleSync(delay){
+  if(!syncReady())return;
+  clearTimeout(sync.timer);
+  if(sync.state!=="busy")setSyncState("pending");
+  sync.timer=setTimeout(()=>runSync(false),delay==null?2500:delay);
+}
+async function gasCall(payload){
+  let res;
+  try{
+    res=await fetch(state.opts.syncUrl,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"}, // text/plain にすると Apps Script でも CORS エラーにならない
+      body:JSON.stringify({...payload,key:state.opts.syncKey}),
+      redirect:"follow"
+    });
+  }catch(e){throw ttsErr("network","通信できませんでした")}
+  if(!res.ok)throw ttsErr("http",`サーバーエラー（${res.status}）`);
+  const txt=await res.text();
+  try{return JSON.parse(txt)}catch(e){throw ttsErr("bad_response","URLが違うか、デプロイの「アクセスできるユーザー」が「全員」になっていません")}
+}
+function gasError(r){
+  const m={bad_key:"合言葉が違います",not_configured:"Apps Script の SYNC_KEY（合言葉）が未設定です",busy:"サーバーが混み合っています",conflict:"他の端末と同時に更新されました"};
+  return ttsErr(r&&r.error||"api",m[r&&r.error]||`同期に失敗しました（${r&&r.error||"不明"}）`);
+}
+function localData(){return {cards:state.cards,prefs:state.prefs}}
+function normalizeRemote(d){
+  if(!d||typeof d!=="object")return {cards:[],prefs:{u:-1}};
+  return {cards:sanitizeCards(d.cards),prefs:d.prefs&&typeof d.prefs==="object"?{...DEFAULT_PREFS,...d.prefs}:{u:-1}};
+}
+/* カードごとに「新しく更新された方」を採用する。削除は削除印（del）で伝える */
+function mergeData(a,b){
+  const map=new Map();
+  for(const c of [...a.cards,...b.cards]){
+    const p=map.get(c.id);
+    if(!p||(c.u||0)>(p.u||0))map.set(c.id,c);
+  }
+  const limit=now()-TOMBSTONE_KEEP;
+  const cards=[...map.values()].filter(c=>!c.del||(c.u||0)>limit).sort((x,y)=>(x.cr-y.cr)||(x.id<y.id?-1:1));
+  const prefs=(Number(a.prefs.u)||0)>=(Number(b.prefs.u)||0)?a.prefs:b.prefs;
+  return {cards,prefs:{...DEFAULT_PREFS,...prefs}};
+}
+function dataSig(d){
+  return d.cards.map(c=>`${c.id}:${c.u||0}:${c.del?1:0}`).sort().join(",")+"|"+(Number(d.prefs.u)||0);
+}
+function applyMerged(m){
+  state.cards=m.cards;
+  state.prefs={...DEFAULT_PREFS,...m.prefs};
+  lsSet(LS.cards,state.cards);
+  lsSet(LS.prefs,state.prefs);
+  if(tts.active&&tts.cardId&&!byId(tts.cardId))stopSpeak();
+  applyTheme();applyTtsOptsUI();
+  buildOrder();renderCard();renderList();
+  if(!$("tab-settings").hidden)applySettingsUI();
+}
+async function runSync(manual){
+  if(!syncReady()){if(manual)toast("同期URLと合言葉を設定してください");renderSyncState();return false}
+  if(sync.busy){sync.again=true;return false}
+  clearTimeout(sync.timer);
+  sync.busy=true;setSyncState("busy");
+  try{
+    for(let attempt=0;attempt<3;attempt++){
+      const g=await gasCall({action:"get"});
+      if(!g||!g.ok)throw gasError(g);
+      const remote=normalizeRemote(g.data);
+      const local=localData();
+      const merged=mergeData(local,remote);
+      const mSig=dataSig(merged);
+      if(mSig!==dataSig(local))applyMerged(merged);
+      if(!g.data||mSig!==dataSig(remote)){
+        const p=await gasCall({action:"put",baseRev:Number(g.rev)||0,data:merged});
+        if(!p||!p.ok){if(p&&p.error==="conflict")continue;throw gasError(p)}
+      }
+      state.opts.lastSync=now();saveOpts();
+      setSyncState("ok");
+      if(manual)toast("同期しました");
+      return true;
+    }
+    throw ttsErr("conflict","他の端末と同時に更新されました。もう一度お試しください");
+  }catch(e){
+    setSyncState("error",e.message||"不明なエラー");
+    if(manual)toast(`同期できませんでした：${e.message||"不明なエラー"}`);
+    return false;
+  }finally{
+    sync.busy=false;
+    if(sync.again){sync.again=false;scheduleSync(800)}
+  }
+}
+$("s-sync-save").onclick=()=>{
+  let url=$("s-sync-url").value.trim();
+  const key=$("s-sync-key").value.trim();
+  if(url&&!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){toast("Apps Script のウェブアプリURL（https://script.google.com/…/exec）を入れてください");return}
+  state.opts.syncUrl=url;state.opts.syncKey=key;saveOpts();
+  renderSyncState();
+  if(syncReady()){toast("保存しました。同期します");runSync(true)}else toast("保存しました");
+};
+$("s-sync-now").onclick=()=>{$("s-sync-save").onclick()};
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    if(syncReady()&&now()-(state.opts.lastSync||0)>15000)runSync(false);
+  }else if(sync.timer&&syncReady()){runSync(false)}
+});
+window.addEventListener("online",()=>{if(syncReady())runSync(false)});
+setInterval(()=>{if(document.visibilityState==="visible"&&syncReady()&&!sync.busy&&now()-(state.opts.lastSync||0)>120000)runSync(false)},30000);
+
+/* ---------- 起動 ---------- */
+function applyRestoredView(){
+  view.q=state.opts.q||"";$("q").value=view.q;
+  view.lq=state.opts.lq||"";$("lq").value=view.lq;
+  $("a-c").value=state.opts.lastCat||"";
+  $("bulk-c").value=state.opts.lastCat||"";
+  applyTheme();
+  applyTtsOptsUI();
+  buildOrder();
+  renderCard();
+  setTtsUI("idle",TTS_IDLE_TEXT);
+  renderTtsSections();
+  syncSpeakBtn();
+  tab(state.opts.tab||"study");
+  renderSyncState();
+}
+initMediaSession();
+applyRestoredView();
+if(syncReady())runSync(false);
+window.__narreji={state,view,tts,runSync,speakChunks,getCardSpeakChunks,mergeData};
+</script>
+</body>
+</html>
