@@ -280,19 +280,6 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <button class="btn pdf-open" type="button" data-pdf-open><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><path d="M12 12v6M9.5 15.5 12 18l2.5-2.5"/></svg><span>PDFを読み込む</span></button>
     </div>
 
-    <article class="card" id="card" hidden>
-      <div class="card-top">
-        <span class="tag" id="card-cat"></span>
-        <span class="ok-badge" id="card-ok" hidden>✓ 覚えた</span>
-      </div>
-      <div class="card-yomi" id="card-yomi" hidden></div>
-      <h2 class="card-title" id="card-title"></h2>
-      <div class="desc-wrap">
-        <div class="desc" id="desc"></div>
-        <button class="desc-mask" id="desc-mask" type="button" hidden>タップして答えを表示</button>
-      </div>
-    </article>
-
     <div class="card-actions" id="card-actions" hidden>
       <button class="btn" id="prev" type="button" aria-label="前のカード"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg><span>前へ</span></button>
       <button class="btn primary" id="speak" type="button"></button>
@@ -309,6 +296,20 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <button class="ibtn" id="open-rec" type="button"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>録音・保存</span></button>
       <button class="ibtn pdf-open" type="button" data-pdf-open><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><path d="M12 12v6M9.5 15.5 12 18l2.5-2.5"/></svg><span>PDFを読み込む</span></button>
     </div>
+
+    <!-- カードは操作ボタンの下（長いカードでもボタンがすぐ押せるように） -->
+    <article class="card" id="card" hidden>
+      <div class="card-top">
+        <span class="tag" id="card-cat"></span>
+        <span class="ok-badge" id="card-ok" hidden>✓ 覚えた</span>
+      </div>
+      <div class="card-yomi" id="card-yomi" hidden></div>
+      <h2 class="card-title" id="card-title"></h2>
+      <div class="desc-wrap">
+        <div class="desc" id="desc"></div>
+        <button class="desc-mask" id="desc-mask" type="button" hidden>タップして答えを表示</button>
+      </div>
+    </article>
   </section>
 
   <!-- 一覧タブ -->
@@ -711,11 +712,14 @@ const cur=()=>byId(view.order[view.idx]);
 function select(i,keepTts){
   if(!view.order.length)return;
   const ni=Math.max(0,Math.min(view.order.length-1,i));
-  if(ni!==view.idx)view.revealed=false;
+  const changed=ni!==view.idx;
+  if(changed)view.revealed=false;
   view.idx=ni;
   state.opts.curId=view.order[ni]||null;
   saveOpts();
   renderCard();
+  // 長いカードを下まで読んだあとに次のカードへ進んだら、ボタンとカードの先頭が見える位置にもどす
+  if(changed&&!$("tab-study").hidden&&window.scrollY>0)window.scrollTo({top:0,behavior:"smooth"});
   if(!keepTts)renderList();
 }
 
