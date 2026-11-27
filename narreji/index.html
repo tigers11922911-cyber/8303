@@ -233,6 +233,11 @@ fieldset.choice label{display:flex;gap:10px;align-items:flex-start;border:1px so
 fieldset.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
 #pdf-preview,#pdf-panel{scroll-margin-top:72px}
+.drive-box{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+#drive-files li{align-items:center;padding:8px 8px 8px 12px;gap:8px}
+#drive-files .df-name{flex:1;min-width:0;display:flex;flex-direction:column}
+#drive-files .df-name b{font-size:.88rem;word-break:break-all}
+#drive-files .df-name span{font-size:.75rem;color:var(--muted)}
 .dict-add{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px;align-items:center}
 .dict-arrow{color:var(--muted);font-weight:800}
 .dict-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -464,6 +469,8 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
           <li>「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」。実行ユーザー「自分」、アクセスできるユーザー「全員」でデプロイし、承認します。</li>
           <li>表示された「ウェブアプリのURL」と合言葉を、上の欄に入れて「今すぐ同期」を押します。</li>
           <li>ほかの端末でも同じURLと合言葉を入れると、カードと朗読設定が同期されます。</li>
+          <li>データは Googleドライブの「マイドライブ › 【100】アプリ › 【3】単語帳」に保存されます。</li>
+          <li>前の版のスクリプトを使っている場合は、新しい内容に置きかえて「デプロイを管理」→ 鉛筆 →「新バージョン」でデプロイし直してください（URLは変わりません）。</li>
         </ol>
       </details>
     </div>
@@ -481,6 +488,17 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
 
     <div class="panel">
       <h2>データ</h2>
+      <div class="drive-box">
+        <div class="small" style="font-weight:800">Googleドライブに保存</div>
+        <div class="muted small" style="line-height:1.6">保存先：マイドライブ › 【100】アプリ › 【3】単語帳<br>（同期の設定をすると使えます。毎日1回「ナレジ単語帳_日付.json」を自動で保存します）</div>
+        <label class="switch small">毎日1回、自動でドライブにバックアップする<input type="checkbox" id="drive-auto"></label>
+        <div class="row wrap">
+          <button class="btn grow" id="drive-backup" type="button">今すぐ保存</button>
+          <button class="btn grow" id="drive-list" type="button">ドライブから読み込む</button>
+        </div>
+        <div class="muted small" id="drive-status" aria-live="polite"></div>
+        <ul class="list" id="drive-files" hidden></ul>
+      </div>
       <div class="row wrap">
         <button class="btn grow" id="export" type="button">バックアップを書き出す</button>
         <button class="btn grow" id="import" type="button">バックアップを読み込む</button>
@@ -669,7 +687,7 @@ const TTS_VOICES=[
 ];
 const CHUNK_LENS=[180,320,500,800,1000,1500];  // 1回に読む文字数（多いほど Gemini に頼む回数が減り、無料枠で長く読める）
 const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",dict:[],chunkLen:500,u:0};
-const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:""};
+const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:"",driveAuto:true,lastDriveBackup:""};
 
 const state={
   cards:sanitizeCards(lsGet(LS.cards,[])),        // 削除したカードは {id,del:1,u} として残し、同期で他端末にも伝える
@@ -2428,6 +2446,7 @@ function applySettingsUI(){
   $("s-rate-val").textContent=`（${p.rate.toFixed(2)}倍）`;
   $("s-autonext").checked=p.autoNext;
   $("s-chunk").value=String(p.chunkLen);
+  $("drive-auto").checked=state.opts.driveAuto!==false;
   $("s-theme").value=state.prefs.theme||"auto";
   renderDict();
   $("s-sync-url").value=state.opts.syncUrl||"";
@@ -2475,12 +2494,15 @@ $("import-file").onchange=async e=>{
   if(!f)return;
   let data;
   try{data=JSON.parse(await f.text())}catch(err){toast("読み込めませんでした（JSON形式ではありません）");return}
+  importCardsData(data);
+};
+function importCardsData(data,label){
   const incoming=sanitizeCards(normalizeImported(Array.isArray(data)?data:data&&data.cards)).filter(c=>!c.del);
   if(!incoming.length){toast("カードが見つかりませんでした");return}
   const byCat={};incoming.forEach(c=>{const k=c.c||"未分類";byCat[k]=(byCat[k]||0)+1});
   const catLine=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} ${n}`).join("・");
   const dup=incoming.filter(c=>state.cards.some(x=>x.id===c.id&&!x.del)).length;
-  ask(`${incoming.length}件のカードを読み込みますか？\n（${catLine}）${dup?`\n\nそのうち${dup}件は、すでにあるカードを読み込んだ内容で上書きします。`:""}`,"読み込む",()=>{
+  ask(`${label?label+"\n":""}${incoming.length}件のカードを読み込みますか？\n（${catLine}）${dup?`\n\nそのうち${dup}件は、すでにあるカードを読み込んだ内容で上書きします。`:""}`,"読み込む",()=>{
     const t=now();
     for(const c of incoming){
       c.u=t;
@@ -2490,7 +2512,7 @@ $("import-file").onchange=async e=>{
     save();buildOrder();renderCard();renderList();
     toast(`${incoming.length}件を読み込みました`,"学習で見る",()=>openInStudy(incoming[0].id));
   });
-};
+}
 $("clear-all-data").onclick=()=>{
   const n=liveCards().length;
   if(!n){toast("消去するカードがありません");return}
@@ -2551,6 +2573,81 @@ function gasError(r){
   return ttsErr(r&&r.error||"api",m[r&&r.error]||`同期に失敗しました（${r&&r.error||"不明"}）`);
 }
 function localData(){return {cards:state.cards,prefs:state.prefs}}
+
+/* ---------- Googleドライブ（【100】アプリ › 【3】単語帳）へのバックアップ ---------- */
+function jstDate(){
+  const d=new Date(Date.now()+9*3600e3);
+  return d.toISOString().slice(0,10).replace(/-/g,"");
+}
+function driveNeedsUpdate(r){
+  return r&&r.error==="bad_action"?"同期用の Apps Script が古い版です。README の手順で新しい版に置きかえて、デプロイし直してください":null;
+}
+async function driveBackup(manual){
+  if(!syncReady()){if(manual)toast("先に「同期」の設定（URLと合言葉）をしてください");return false}
+  const live=liveCards();
+  if(!live.length){if(manual)toast("保存するカードがありません");return false}
+  if(manual)$("drive-status").textContent="Googleドライブに保存しています…";
+  try{
+    const r=await gasCall({action:"backup",data:{cards:live,prefs:state.prefs}});
+    if(!r||!r.ok)throw ttsErr(r&&r.error||"api",driveNeedsUpdate(r)||gasError(r).message);
+    state.opts.lastDriveBackup=jstDate();saveOpts();
+    const msg=`保存しました：${r.folder||"【100】アプリ › 【3】単語帳"} › ${r.name}（${live.length}枚）`;
+    $("drive-status").textContent=msg;
+    if(manual)toast("Googleドライブに保存しました");
+    return true;
+  }catch(e){
+    $("drive-status").textContent=`ドライブに保存できませんでした：${e.message||"不明なエラー"}`;
+    if(manual)toast(`ドライブに保存できませんでした：${e.message||"不明なエラー"}`);
+    return false;
+  }
+}
+/* 同期のあと、その日まだならドライブにバックアップ */
+function maybeAutoDriveBackup(){
+  if(state.opts.driveAuto===false||!syncReady())return;
+  if(state.opts.lastDriveBackup===jstDate())return;
+  driveBackup(false);
+}
+async function driveListBackups(){
+  if(!syncReady()){toast("先に「同期」の設定（URLと合言葉）をしてください");return}
+  const ul=$("drive-files");
+  $("drive-status").textContent="Googleドライブのバックアップを探しています…";
+  try{
+    const r=await gasCall({action:"list_backups"});
+    if(!r||!r.ok)throw ttsErr(r&&r.error||"api",driveNeedsUpdate(r)||gasError(r).message);
+    ul.innerHTML="";
+    const files=Array.isArray(r.files)?r.files:[];
+    $("drive-status").textContent=files.length?`${r.folder||"【100】アプリ › 【3】単語帳"} のバックアップ（新しい順）`:"このフォルダにバックアップはまだありません";
+    ul.hidden=!files.length;
+    for(const f of files){
+      const li=document.createElement("li");
+      const nm=document.createElement("div");nm.className="df-name";
+      const b=document.createElement("b");b.textContent=String(f.name||"");
+      const sp=document.createElement("span");
+      const d=new Date(Number(f.updated)||0);
+      sp.textContent=`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}・${Math.max(1,Math.round((Number(f.size)||0)/1024))}KB`;
+      nm.append(b,sp);
+      const btn=document.createElement("button");btn.type="button";btn.className="ibtn";btn.textContent="読み込む";
+      btn.onclick=async()=>{
+        btn.disabled=true;$("drive-status").textContent=`「${f.name}」を読み込んでいます…`;
+        try{
+          const g=await gasCall({action:"get_backup",id:String(f.id||"")});
+          if(!g||!g.ok)throw ttsErr(g&&g.error||"api",g&&g.error==="not_found"?"ファイルが見つかりませんでした":gasError(g).message);
+          let data;try{data=JSON.parse(g.text)}catch(e){throw ttsErr("bad_json","このファイルは単語帳のデータではありません")}
+          $("drive-status").textContent="";
+          importCardsData(data,`ドライブの「${g.name}」`);
+        }catch(e){$("drive-status").textContent=`読み込めませんでした：${e.message||"不明なエラー"}`}
+        finally{btn.disabled=false}
+      };
+      li.append(nm,btn);ul.append(li);
+    }
+  }catch(e){
+    ul.hidden=true;
+    $("drive-status").textContent=`一覧を取れませんでした：${e.message||"不明なエラー"}`;
+  }
+}
+$("drive-backup").onclick=()=>driveBackup(true);
+$("drive-list").onclick=()=>driveListBackups();
+$("drive-auto").onchange=()=>{state.opts.driveAuto=$("drive-auto").checked;saveOpts();if(state.opts.driveAuto)maybeAutoDriveBackup()};
 function normalizeRemote(d){
   if(!d||typeof d!=="object")return {cards:[],prefs:{u:-1}};
   return {cards:sanitizeCards(d.cards),prefs:d.prefs&&typeof d.prefs==="object"?{...DEFAULT_PREFS,...d.prefs}:{u:-1}};
@@ -2599,6 +2696,7 @@ async function runSync(manual){
         if(!p||!p.ok){if(p&&p.error==="conflict")continue;throw gasError(p)}
       }
       state.opts.lastSync=now();saveOpts();
+      setTimeout(maybeAutoDriveBackup,1500);
       setSyncState("ok");
       if(manual)toast("同期しました");
       return true;
