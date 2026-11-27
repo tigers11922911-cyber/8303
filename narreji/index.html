@@ -126,6 +126,7 @@ textarea{resize:vertical;min-height:120px;line-height:1.6}
 .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tag{font-size:.72rem;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 10px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ok-badge{font-size:.72rem;font-weight:800;color:var(--ok)}
+.card-yomi{font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:-10px}
 .card-title{font-size:1.28rem;font-weight:800;line-height:1.45;margin:0;word-break:break-word}
 .desc-wrap{position:relative}
 .desc{white-space:pre-wrap;word-break:break-word;font-size:1rem;line-height:1.8}
@@ -273,6 +274,7 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
         <span class="tag" id="card-cat"></span>
         <span class="ok-badge" id="card-ok" hidden>✓ 覚えた</span>
       </div>
+      <div class="card-yomi" id="card-yomi" hidden></div>
       <h2 class="card-title" id="card-title"></h2>
       <div class="desc-wrap">
         <div class="desc" id="desc"></div>
@@ -307,9 +309,11 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
   <!-- 追加タブ -->
   <section class="tab" id="tab-add" hidden>
     <button class="btn block pdf-open pdf-open-big" type="button" data-pdf-open><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><path d="M12 12v6M9.5 15.5 12 18l2.5-2.5"/></svg><span>PDFを読み込んでカードを作る</span></button>
+    <button class="btn block" type="button" id="import-top"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>単語帳ファイル（JSON）を読み込む</span></button>
     <div class="panel">
       <h2 id="add-head">カードを追加</h2>
       <label class="fld">見出し（表）<input type="text" id="a-f" placeholder="例：光合成とは" autocomplete="off"></label>
+      <label class="fld">読み（ふりがな・空欄でもOK）<input type="text" id="a-y" placeholder="例：こうごうせいとは" autocomplete="off"></label>
       <label class="fld">本文（裏・朗読される内容）<textarea id="a-b" placeholder="段落ごとに改行すると、段落の合間に間があきます"></textarea></label>
       <label class="fld">カテゴリ<input type="text" id="a-c" list="cat-list" autocomplete="off"></label>
       <datalist id="cat-list"></datalist>
@@ -562,6 +566,7 @@ const ICO={
 
 /* ---------- 保存 ---------- */
 const LS={cards:"narreji.v1.cards",prefs:"narreji.v1.prefs",local:"narreji.v1.local"};
+const MAX_BODY=100000;  // 本文の最大文字数（本の解説など長い文章も入るように）。state を作る前に決めておく
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
 function lsSet(k,v){
   try{localStorage.setItem(k,JSON.stringify(v));return true}
@@ -596,6 +601,26 @@ const state={
 };
 if(!state.opts.ttsPos||typeof state.opts.ttsPos!=="object")state.opts.ttsPos={};
 
+/* ほかの単語帳アプリ（AI用語集 ai-yougo など）の形式を、このアプリの形に合わせる */
+function strHash(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(36)}
+function normalizeImported(arr){
+  if(!Array.isArray(arr))return [];
+  const base=now();
+  return arr.filter(c=>c&&typeof c==="object"&&!c.del).map((c,i)=>{
+    const cat=c.c!=null?c.c:(c.cat!=null?c.cat:c.category);
+    const f=String(c.f!=null?c.f:(c.term!=null?c.term:c.q||""));
+    const b=String(c.b!=null?c.b:(c.desc!=null?c.desc:c.a||""));
+    return {
+      ...c,
+      // IDが無いカードは中身から決まるIDにする（同じファイルを2回読み込んでも重ならない）
+      id:c.id?String(c.id):"imp-"+strHash(f+"\u0001"+(cat||"")),
+      f,b,c:String(cat||""),
+      y:c.y!=null?c.y:c.yomi,
+      k:c.k!=null?c.k:c.kind,
+      cr:Number(c.cr)||base+i
+    };
+  });
+}
 function sanitizeCards(arr){
   if(!Array.isArray(arr))return [];
   const out=[],seen=new Set();
@@ -603,15 +628,18 @@ function sanitizeCards(arr){
     if(!c||typeof c!=="object"||!c.id||seen.has(String(c.id)))continue;
     const id=String(c.id);seen.add(id);
     if(c.del){out.push({id,del:1,u:Number(c.u)||0,cr:Number(c.cr)||0});continue}
-    out.push({
+    const card={
       id,
       f:String(c.f||"").slice(0,500),
-      b:String(c.b||"").slice(0,20000),
+      b:String(c.b||"").slice(0,MAX_BODY),
       c:String(c.c||"").slice(0,60),
       ok:!!c.ok,
       cr:Number(c.cr)||Number(c.u)||0,
       u:Number(c.u)||0
-    });
+    };
+    if(c.y)card.y=String(c.y).slice(0,200);   // 読み（ふりがな）。朗読ではこちらを読む
+    if(c.k)card.k=String(c.k).slice(0,30);    // 種類（book・article など）
+    out.push(card);
   }
   return out;
 }
@@ -632,7 +660,7 @@ function buildOrder(){
   view.order=liveCards()
     .filter(c=>!cat||c.c===cat)
     .filter(c=>!state.opts.onlyNew||!c.ok)
-    .filter(c=>!q||(c.f+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q))
+    .filter(c=>!q||(c.f+"\n"+(c.y||"")+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q))
     .sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1))
     .map(c=>c.id);
   const i=keepId?view.order.indexOf(keepId):-1;
@@ -745,6 +773,7 @@ function renderCard(){
   $("card-cat").textContent=c.c||"未分類";
   $("card-ok").hidden=!c.ok;
   $("card-title").textContent=c.f||"（見出しなし）";
+  $("card-yomi").hidden=!c.y;$("card-yomi").textContent=c.y||"";
   $("desc").textContent=c.b||"";
   $("prev").disabled=view.idx<=0;
   $("next").disabled=view.idx>=view.order.length-1;
@@ -795,7 +824,7 @@ function renderList(){
   if($("tab-list").hidden)return;
   const ul=$("list");ul.innerHTML="";
   const q=view.lq.trim().toLowerCase();
-  const items=liveCards().filter(c=>!q||(c.f+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q)).sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1));
+  const items=liveCards().filter(c=>!q||(c.f+"\n"+(c.y||"")+"\n"+c.b+"\n"+c.c).toLowerCase().includes(q)).sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1));
   $("list-count").textContent=items.length?`${items.length}件`:(liveCards().length?"見つかりませんでした":"カードがまだありません");
   const curId=view.order[view.idx];
   for(const c of items){
@@ -841,36 +870,38 @@ let editingId=null;
 function startEdit(id){
   const c=byId(id);if(!c)return;
   editingId=id;
-  $("a-f").value=c.f;$("a-b").value=c.b;$("a-c").value=c.c;
+  $("a-f").value=c.f;$("a-b").value=c.b;$("a-c").value=c.c;$("a-y").value=c.y||"";
   $("add-head").textContent="カードを編集";$("a-save").textContent="変更を保存";$("a-cancel").hidden=false;
   tab("add");
 }
 function endEdit(){
   editingId=null;
-  $("a-f").value="";$("a-b").value="";
+  $("a-f").value="";$("a-b").value="";$("a-y").value="";
   $("a-c").value=state.opts.lastCat||"";
   $("add-head").textContent="カードを追加";$("a-save").textContent="追加する";$("a-cancel").hidden=true;
 }
 $("a-cancel").onclick=()=>{endEdit();tab("study")};
 $("a-save").onclick=()=>{
-  const f=$("a-f").value.trim(),b=$("a-b").value.replace(/\r/g,"").trim(),c=$("a-c").value.trim();
+  const f=$("a-f").value.trim(),b=$("a-b").value.replace(/\r/g,"").trim(),c=$("a-c").value.trim(),y=$("a-y").value.trim();
   if(!f&&!b){toast("見出しか本文を入力してください");return}
   state.opts.lastCat=c;saveOpts();
   if(editingId){
     const card=byId(editingId);
     if(card){
       if(tts.active&&tts.cardId===card.id)stopSpeak();
-      if(card.f!==f||card.b!==b){setCardTtsPos(card.id,0,true)}
+      if(card.f!==f||card.b!==b||(card.y||"")!==y){setCardTtsPos(card.id,0,true)}
       Object.assign(card,{f,b,c,u:now()});
+      if(y)card.y=y;else delete card.y;
       save();buildOrder();renderCard();
       const id=editingId;endEdit();toast("保存しました");openInStudy(id);return;
     }
     endEdit();
   }
   const t=now();
-  state.cards.push({id:uid(),f,b,c,ok:false,cr:t,u:t});
+  const nc={id:uid(),f,b,c,ok:false,cr:t,u:t};if(y)nc.y=y;
+  state.cards.push(nc);
   save();buildOrder();renderCard();
-  $("a-f").value="";$("a-b").value="";$("a-f").focus();
+  $("a-f").value="";$("a-b").value="";$("a-y").value="";$("a-f").focus();
   toast("追加しました");
 };
 function parseBulk(text){
@@ -1246,7 +1277,8 @@ function speakChunks(text){
 }
 function getCardSpeakChunks(c,hideAns){
   if(!c)return [];
-  const front=String(c.f||"").trim();
+  // 読み（ふりがな）があれば、見出しの代わりに読みを読み上げる
+  const front=String(c.y||c.f||"").trim();
   const back=String(c.b||"").trim();
   // 見出しが句点などで終わっていれば「。」を重ねない
   const head=!front||/[。．.！？!?]$/.test(front)?front:front+"。";
@@ -2027,14 +2059,18 @@ $("export").onclick=()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 };
 $("import").onclick=()=>$("import-file").click();
+$("import-top").onclick=()=>$("import-file").click();
 $("import-file").onchange=async e=>{
   const f=e.target.files&&e.target.files[0];e.target.value="";
   if(!f)return;
   let data;
   try{data=JSON.parse(await f.text())}catch(err){toast("読み込めませんでした（JSON形式ではありません）");return}
-  const incoming=sanitizeCards(Array.isArray(data)?data:data&&data.cards).filter(c=>!c.del);
+  const incoming=sanitizeCards(normalizeImported(Array.isArray(data)?data:data&&data.cards)).filter(c=>!c.del);
   if(!incoming.length){toast("カードが見つかりませんでした");return}
-  ask(`${incoming.length}件のカードを読み込みますか？\n（同じカードは読み込んだ内容で上書きします）`,"読み込む",()=>{
+  const byCat={};incoming.forEach(c=>{const k=c.c||"未分類";byCat[k]=(byCat[k]||0)+1});
+  const catLine=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} ${n}`).join("・");
+  const dup=incoming.filter(c=>state.cards.some(x=>x.id===c.id&&!x.del)).length;
+  ask(`${incoming.length}件のカードを読み込みますか？\n（${catLine}）${dup?`\n\nそのうち${dup}件は、すでにあるカードを読み込んだ内容で上書きします。`:""}`,"読み込む",()=>{
     const t=now();
     for(const c of incoming){
       c.u=t;
@@ -2042,7 +2078,7 @@ $("import-file").onchange=async e=>{
       if(i>=0)state.cards[i]=c;else state.cards.push(c);
     }
     save();buildOrder();renderCard();renderList();
-    toast(`${incoming.length}件を読み込みました`);
+    toast(`${incoming.length}件を読み込みました`,"学習で見る",()=>openInStudy(incoming[0].id));
   });
 };
 $("clear-all-data").onclick=()=>{
