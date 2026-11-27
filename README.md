@@ -1,6 +1,21 @@
 # 8303
 
+公開中のアプリ（GitHub Pages：`https://tigers11922911-cyber.github.io/8303/`）
+
+| アプリ | 場所 | 開くアドレス |
+| --- | --- | --- |
+| まーとん酒場（車中泊・温泉・酒場スポットマップ） | `index.html` | `/8303/` |
+| ナレジ 朗読カード（単語帳） | [`narreji/`](narreji/) | `/8303/narreji/` |
+| 計画相談データ転記・反映アプリ（PWA） | [`keikaku-soudan/`](keikaku-soudan/) | `/8303/keikaku-soudan/` |
+| 計画相談 様式アプリ | [`keikaku/`](keikaku/) | `/8303/keikaku/` |
+
 📖 GitHubでアプリをネットに公開するしかた（小学生向けマニュアル）：スマホ版 `manual/github.html`／MacBook版 `manual/github-mac.html`
+
+`main` に変更が入ると、`.github/workflows/pages-deploy.yml` が自動で GitHub Pages に公開します。
+
+---
+
+# まーとん酒場（`index.html`）
 
 まーとん酒場 — 車中泊・温泉・酒場スポットマップ（`index.html` 単一ファイルのSPA）。
 
