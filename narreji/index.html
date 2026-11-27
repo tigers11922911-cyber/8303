@@ -222,6 +222,20 @@ code{font-size:.85em;background:var(--bg);border:1px solid var(--line);border-ra
 .switch{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;font-size:.9rem}
 .switch input{width:22px;height:22px;accent-color:var(--accent)}
 input[type=range]{width:100%;accent-color:var(--accent)}
+/* PDFから追加 */
+fieldset.choice{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+fieldset.choice legend{font-size:.82rem;font-weight:700;color:var(--muted);padding:0;margin-bottom:4px}
+fieldset.choice label{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg);line-height:1.5;cursor:pointer}
+fieldset.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+#pdf-preview{scroll-margin-top:72px}
+.pick-list{max-height:55vh;overflow-y:auto}
+.pick-list li{align-items:flex-start;padding:10px 12px;gap:10px}
+.pick-list input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent);flex:none}
+.pick-list .pk-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pick-list .pk-f{font-weight:800;word-break:break-word}
+.pick-list .pk-b{font-size:.82rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.pick-list li.off{opacity:.5}
 </style>
 </head>
 <body>
@@ -302,6 +316,41 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <textarea id="bulk-text" placeholder="光合成とは&#10;植物が光のエネルギーで…&#10;---&#10;呼吸とは&#10;…"></textarea>
       <label class="fld">カテゴリ<input type="text" id="bulk-c" list="cat-list" autocomplete="off"></label>
       <button class="btn primary" id="bulk-add" type="button">まとめて追加する</button>
+    </div>
+    <div class="panel" id="pdf-panel">
+      <h2>PDFから追加</h2>
+      <p class="muted small" style="margin:0">PDFを読み取って、カードを作ります。追加する前に、できたカードを確かめられます。</p>
+      <div class="row">
+        <button class="btn" id="pdf-pick" type="button">PDFをえらぶ</button>
+        <span class="muted small grow" id="pdf-name">まだえらんでいません</span>
+      </div>
+      <input type="file" id="pdf-file" accept="application/pdf,.pdf" hidden>
+      <fieldset class="choice" id="pdf-mode">
+        <legend>カードの作り方</legend>
+        <label><input type="radio" name="pdf-mode" value="page" checked><span><b>1ページ＝1枚</b><br><span class="muted small">PDFの文字をそのままカードに。PDFを読み上げてもらうときに</span></span></label>
+        <label><input type="radio" name="pdf-mode" value="ai"><span><b>AIで単語帳にする</b><br><span class="muted small">Geminiが大事な用語と説明を抜き出します（APIキーが必要）。写真のPDFも読めます</span></span></label>
+      </fieldset>
+      <label class="fld" id="pdf-count-wrap" hidden>作るカードの数（目安）
+        <select id="pdf-count"><option value="10">10枚くらい</option><option value="20" selected>20枚くらい</option><option value="40">40枚くらい</option><option value="80">80枚くらい</option></select>
+      </label>
+      <label class="fld">カテゴリ<input type="text" id="pdf-c" list="cat-list" autocomplete="off"></label>
+      <div class="row">
+        <button class="btn primary grow" id="pdf-read" type="button" disabled>読み取る</button>
+        <button class="btn" id="pdf-cancel" type="button" hidden>やめる</button>
+      </div>
+      <div class="muted small" id="pdf-status" aria-live="polite"></div>
+      <div id="pdf-preview" hidden>
+        <div class="row wrap" style="margin-bottom:8px">
+          <span class="grow small" id="pdf-preview-count" style="font-weight:700"></span>
+          <button class="ibtn" id="pdf-all" type="button">全部えらぶ</button>
+          <button class="ibtn" id="pdf-none" type="button">全部はずす</button>
+        </div>
+        <ul class="list pick-list" id="pdf-list"></ul>
+        <div class="row" style="margin-top:10px">
+          <button class="btn ghost" id="pdf-discard" type="button">やり直す</button>
+          <button class="btn primary grow" id="pdf-add" type="button">えらんだカードを追加する</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -847,6 +896,262 @@ $("bulk-add").onclick=()=>{
   save();buildOrder();renderCard();
   $("bulk-text").value="";
   toast(`${items.length}件のカードを追加しました`);
+};
+
+/* =========================================================
+   PDFから追加
+   ・1ページ＝1枚：pdf.js で文字を取り出してページごとにカードにする
+   ・AIで単語帳：Gemini に PDF を渡して、用語と説明を抜き出してもらう
+   ========================================================= */
+const PDFJS_URL="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+const AI_TEXT_MODELS=["gemini-flash-latest","gemini-2.5-flash","gemini-2.0-flash"];
+const PDF_AI_MAX_BYTES=15*1024*1024;   // Gemini にそのまま送れるPDFの大きさの目安
+const pdfJob={file:null,buf:null,items:[],busy:false,ctl:null};
+let pdfjsP=null;
+function loadPdfJs(){
+  if(!pdfjsP){
+    pdfjsP=new Promise((res,rej)=>{
+      if(window.pdfjsLib){res(window.pdfjsLib);return}
+      const s=document.createElement("script");
+      s.src=PDFJS_URL+"pdf.min.js";
+      s.onload=()=>{
+        try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_URL+"pdf.worker.min.js";res(window.pdfjsLib)}
+        catch(e){rej(e)}
+      };
+      s.onerror=()=>rej(new Error("pdfjs"));
+      document.head.append(s);
+    }).catch(e=>{pdfjsP=null;throw e});
+  }
+  return pdfjsP;
+}
+const CJK="\\u3000-\\u30ff\\u3400-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef";
+function tidyLine(s){
+  return String(s||"")
+    .replace(/[\u0000-\u0008\u000b-\u001f]/g,"")
+    .replace(/[ \t ]+/g," ")
+    .replace(new RegExp(`([${CJK}]) (?=[${CJK}])`,"g"),"$1")
+    .trim();
+}
+/* 行を段落にまとめる（文の途中の改行はつなぎ、文の終わり・見出し・箇条書きで段落を分ける） */
+function linesToParas(lines){
+  const paras=[];let cur="";
+  const endRe=/[。．！？!?」』）)：:]$/;
+  const bulletRe=/^([・•●○◆◇■□▶▷※\-–—*]|\(?\d{1,3}[).．、]|[①-⑳]|第.{1,4}[章節条])/;
+  for(const raw of lines){
+    const l=tidyLine(raw);
+    if(!l){if(cur){paras.push(cur);cur=""}continue}
+    if(cur&&(endRe.test(cur)||cur.length<14||bulletRe.test(l))){paras.push(cur);cur=l;continue}
+    if(!cur){cur=l;continue}
+    const glue=/[A-Za-z0-9,]$/.test(cur)&&/^[A-Za-z0-9]/.test(l)?" ":"";
+    cur+=glue+l;
+  }
+  if(cur)paras.push(cur);
+  return paras;
+}
+async function pdfPagesText(buf,onProg,isCancelled){
+  const lib=await loadPdfJs();
+  const doc=await lib.getDocument({data:new Uint8Array(buf.slice(0))}).promise;
+  const pages=[];
+  for(let i=1;i<=doc.numPages;i++){
+    if(isCancelled())break;
+    const page=await doc.getPage(i);
+    const tc=await page.getTextContent();
+    const lines=[];let cur="",lastY=null;
+    for(const it of tc.items){
+      if(typeof it.str!=="string")continue;
+      const y=it.transform?Math.round(it.transform[5]):null;
+      if(lastY!==null&&y!==null&&Math.abs(y-lastY)>2&&cur){lines.push(cur);cur=""}
+      cur+=it.str;
+      if(it.hasEOL){lines.push(cur);cur="";lastY=null}else if(y!==null)lastY=y;
+    }
+    if(cur)lines.push(cur);
+    // 縦書きなど、1〜2文字ずつの行ばかりのときは行をつなげる
+    const short=lines.filter(l=>tidyLine(l).length<=2).length;
+    const merged=lines.length>8&&short/lines.length>.6?[lines.join("")]:lines;
+    pages.push(linesToParas(merged));
+    page.cleanup();
+    onProg&&onProg(i,doc.numPages);
+  }
+  try{doc.destroy()}catch(e){}
+  return pages;
+}
+function pdfBaseName(){return String(pdfJob.file&&pdfJob.file.name||"PDF").replace(/\.pdf$/i,"").slice(0,30)}
+function pagesToCards(pages){
+  const base=pdfBaseName(),out=[];
+  pages.forEach((paras,i)=>{
+    if(!paras.length)return;
+    let f,b;
+    if(paras[0].length<=40&&paras.length>1){f=paras[0];b=paras.slice(1).join("\n")}
+    else{f=`${base}（${i+1}ページ）`;b=paras.join("\n")}
+    out.push({f,b:b.slice(0,20000),on:true});
+  });
+  return out;
+}
+function bytesToB64(u8){
+  let s="";
+  for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));
+  return btoa(s);
+}
+async function geminiCardsFrom(part,count,signal){
+  const key=String(state.opts.apiKey||"").trim();
+  if(!key)throw ttsErr("no_key","Gemini APIキーが未設定です");
+  const prompt=[
+    "この資料から、覚えておくべき大事な用語・単語・ポイントを抜き出して、単語帳のカードを作ってください。",
+    `カードはおよそ${count}枚。資料に出てくる順番に並べてください。`,
+    "f は見出し（用語・単語・短い問い）。b はその説明で、資料の内容にもとづいて、やさしい日本語で1〜4文にまとめてください。",
+    "英単語などの語学の資料なら、f に単語、b に意味と短い例文を書いてください。",
+    "資料に書かれていないことは書かないでください。"
+  ].join("\n");
+  const body={
+    contents:[{parts:[part,{text:prompt}]}],
+    generationConfig:{
+      responseMimeType:"application/json",
+      responseSchema:{type:"ARRAY",items:{type:"OBJECT",properties:{f:{type:"STRING"},b:{type:"STRING"}},required:["f","b"]}}
+    }
+  };
+  let lastErr=null;
+  for(const model of AI_TEXT_MODELS){
+    let res;
+    try{
+      res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
+        method:"POST",signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify(body)
+      });
+    }catch(e){
+      if(signal&&signal.aborted)throw ttsErr("cancelled");
+      throw ttsErr("network","通信できませんでした（電波状況を確認してください）");
+    }
+    let j=null;try{j=await res.json()}catch(e){}
+    if(res.ok){
+      const parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[];
+      const txt=parts.map(p=>p.text||"").join("");
+      let arr=null;
+      try{arr=JSON.parse(txt)}catch(e){const m=txt.match(/\[[\s\S]*\]/);if(m){try{arr=JSON.parse(m[0])}catch(e2){}}}
+      if(!Array.isArray(arr))throw ttsErr("bad_ai","AIの答えを読み取れませんでした。もう一度お試しください");
+      return arr.map(x=>({f:tidyLine(x&&x.f).slice(0,500),b:String(x&&x.b||"").trim().slice(0,20000),on:true})).filter(x=>x.f||x.b);
+    }
+    const msg=String(j&&j.error&&j.error.message||"");
+    if(res.status===404||(res.status===400&&/not found|not supported|is not available/i.test(msg))){lastErr=ttsErr("model_unavailable","AIのモデルが使えませんでした");continue}
+    if(res.status===401||res.status===403||/API key not valid|API_KEY_INVALID/i.test(msg))throw ttsErr("bad_key","Gemini APIキーが正しくないか、使えない状態です");
+    if(res.status===429)throw ttsErr("quota","Geminiの利用回数の上限に達しました。しばらくしてからお試しください");
+    if(res.status===400&&/page|too large|exceeds|size/i.test(msg))throw ttsErr("too_big","PDFが大きすぎて読み取れませんでした。ページ数を減らしてお試しください");
+    throw ttsErr("api",`AIでの読み取りに失敗しました（${res.status}）`);
+  }
+  throw lastErr||ttsErr("api","AIでの読み取りに失敗しました");
+}
+function pdfMode(){const r=document.querySelector('input[name="pdf-mode"]:checked');return r?r.value:"page"}
+function setPdfBusy(on,msg){
+  pdfJob.busy=on;
+  $("pdf-read").disabled=on||!pdfJob.file;
+  $("pdf-pick").disabled=on;
+  $("pdf-cancel").hidden=!on;
+  if(msg!=null)$("pdf-status").textContent=msg;
+}
+function renderPdfPreview(){
+  const items=pdfJob.items,ul=$("pdf-list");
+  $("pdf-preview").hidden=!items.length;
+  ul.innerHTML="";
+  items.forEach((it,i)=>{
+    const li=document.createElement("li");li.classList.toggle("off",!it.on);
+    const lab=document.createElement("label");lab.style.cssText="display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;cursor:pointer";
+    const cb=document.createElement("input");cb.type="checkbox";cb.checked=it.on;
+    cb.onchange=()=>{it.on=cb.checked;li.classList.toggle("off",!it.on);updatePdfCount()};
+    const tx=document.createElement("span");tx.className="pk-text";
+    const f=document.createElement("span");f.className="pk-f";f.textContent=it.f||"（見出しなし）";
+    const b=document.createElement("span");b.className="pk-b";b.textContent=it.b;
+    tx.append(f,b);lab.append(cb,tx);li.append(lab);ul.append(li);
+  });
+  updatePdfCount();
+}
+function updatePdfCount(){
+  const n=pdfJob.items.filter(x=>x.on).length;
+  $("pdf-preview-count").textContent=`${pdfJob.items.length}枚できました（${n}枚をえらんでいます）`;
+  $("pdf-add").disabled=!n;
+  $("pdf-add").textContent=n?`えらんだ${n}枚を追加する`:"カードをえらんでください";
+}
+function resetPdfPreview(){pdfJob.items=[];renderPdfPreview()}
+document.querySelectorAll('input[name="pdf-mode"]').forEach(r=>r.onchange=()=>{$("pdf-count-wrap").hidden=pdfMode()!=="ai"});
+$("pdf-pick").onclick=()=>$("pdf-file").click();
+$("pdf-file").onchange=async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";
+  if(!f)return;
+  if(!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf"){toast("PDFファイルをえらんでください");return}
+  pdfJob.file=f;pdfJob.buf=await f.arrayBuffer();
+  const mb=f.size/1024/1024;
+  $("pdf-name").textContent=`${f.name}（${mb<1?Math.max(1,Math.round(f.size/1024))+"KB":mb.toFixed(1)+"MB"}）`;
+  if(!$("pdf-c").value.trim())$("pdf-c").value=state.opts.lastCat||"";
+  resetPdfPreview();
+  setPdfBusy(false,"「読み取る」をおしてください");
+};
+$("pdf-cancel").onclick=()=>{
+  if(pdfJob.ctl)try{pdfJob.ctl.abort()}catch(e){}
+  pdfJob.ctl=null;setPdfBusy(false,"やめました");
+};
+$("pdf-read").onclick=async()=>{
+  if(!pdfJob.file||pdfJob.busy)return;
+  const mode=pdfMode();
+  const ctl=new AbortController();pdfJob.ctl=ctl;
+  const cancelled=()=>ctl.signal.aborted;
+  resetPdfPreview();
+  try{
+    if(mode==="page"){
+      setPdfBusy(true,"PDFを読み取っています…");
+      const pages=await pdfPagesText(pdfJob.buf,(i,n)=>{if(!cancelled())$("pdf-status").textContent=`PDFを読み取っています…（${i}/${n}ページ）`},cancelled);
+      if(cancelled())return;
+      const items=pagesToCards(pages);
+      if(!items.length){setPdfBusy(false,"文字を読み取れませんでした。写真をPDFにしたものかもしれません。「AIで単語帳にする」をためしてください。");return}
+      pdfJob.items=items;
+      setPdfBusy(false,`${pages.length}ページを読み取りました。追加するカードをえらんでください。`);
+    }else{
+      if(!String(state.opts.apiKey||"").trim()){toast("「設定」でGemini APIキーを入れてください","設定へ",()=>tab("settings"));return}
+      const count=Number($("pdf-count").value)||20;
+      let part;
+      if(pdfJob.file.size<=PDF_AI_MAX_BYTES){
+        part={inlineData:{mimeType:"application/pdf",data:bytesToB64(new Uint8Array(pdfJob.buf))}};
+      }else{
+        // 大きいPDFは文字だけを取り出して送る
+        setPdfBusy(true,"PDFが大きいので、文字だけを取り出しています…");
+        const pages=await pdfPagesText(pdfJob.buf,(i,n)=>{if(!cancelled())$("pdf-status").textContent=`文字を取り出しています…（${i}/${n}ページ）`},cancelled);
+        if(cancelled())return;
+        const text=pages.map((p,i)=>`【${i+1}ページ】\n${p.join("\n")}`).join("\n\n").slice(0,300000);
+        if(!text.replace(/【\d+ページ】/g,"").trim()){setPdfBusy(false,"PDFが大きすぎて（15MB以上）、文字も読み取れませんでした。ページを分けたPDFでお試しください。");return}
+        part={text};
+      }
+      setPdfBusy(true,"Geminiが資料を読んで、カードを作っています…（1分ほどかかることがあります）");
+      const items=await geminiCardsFrom(part,count,ctl.signal);
+      if(cancelled())return;
+      if(!items.length){setPdfBusy(false,"カードを作れませんでした。もう一度お試しください。");return}
+      pdfJob.items=items;
+      setPdfBusy(false,"カードができました。追加するカードをえらんでください。");
+    }
+    renderPdfPreview();
+    $("pdf-preview").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(err){
+    if(err&&(err.code==="cancelled"||err.name==="AbortError"))return;
+    const msg=err&&err.message==="pdfjs"?"PDFを読むための部品を読み込めませんでした（電波状況を確認してください）"
+      :err&&err.name==="PasswordException"?"パスワードのかかったPDFは読み取れません"
+      :err&&err.name==="InvalidPDFException"?"PDFファイルがこわれているか、PDFではありません"
+      :(err&&err.message)||"読み取れませんでした";
+    setPdfBusy(false,msg);
+    if(err&&err.code==="bad_key")toast(msg,"設定へ",()=>tab("settings"));
+  }finally{
+    if(pdfJob.ctl===ctl){pdfJob.ctl=null;if(pdfJob.busy)setPdfBusy(false)}
+  }
+};
+$("pdf-all").onclick=()=>{pdfJob.items.forEach(x=>x.on=true);renderPdfPreview()};
+$("pdf-none").onclick=()=>{pdfJob.items.forEach(x=>x.on=false);renderPdfPreview()};
+$("pdf-discard").onclick=()=>{resetPdfPreview();$("pdf-status").textContent=pdfJob.file?"「読み取る」をおすと、もう一度読み取ります":""};
+$("pdf-add").onclick=()=>{
+  const items=pdfJob.items.filter(x=>x.on&&(x.f||x.b));
+  if(!items.length){toast("追加するカードをえらんでください");return}
+  const c=$("pdf-c").value.trim();
+  state.opts.lastCat=c;saveOpts();
+  let t=now();
+  const firstId=uid();
+  items.forEach((it,i)=>{state.cards.push({id:i?uid():firstId,f:it.f,b:it.b,c,ok:false,cr:t,u:t});t++});
+  save();buildOrder();renderCard();
+  resetPdfPreview();
+  $("pdf-status").textContent=`${items.length}枚のカードを追加しました`;
+  toast(`PDFから${items.length}枚のカードを追加しました`,"学習で見る",()=>openInStudy(firstId));
 };
 
 /* =========================================================
