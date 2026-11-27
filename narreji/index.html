@@ -233,6 +233,29 @@ fieldset.choice label{display:flex;gap:10px;align-items:flex-start;border:1px so
 fieldset.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
 #pdf-preview,#pdf-panel{scroll-margin-top:72px}
+/* データをえらぶ画面 */
+#picker{align-items:flex-end;padding:0}
+@media (min-width:700px){#picker{align-items:center;padding:16px}}
+.sheet{background:var(--surface);width:100%;max-width:640px;max-height:92dvh;display:flex;flex-direction:column;gap:10px;padding:14px 14px calc(14px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0;box-shadow:var(--shadow)}
+@media (min-width:700px){.sheet{border-radius:18px}}
+.sheet-head{display:flex;align-items:flex-start;gap:8px}
+.pk-title{font-weight:800;font-size:1.02rem;line-height:1.4}
+.pk-groups{flex:1;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 0}
+.pk-group{flex:none;border:1px solid var(--line);border-radius:12px;background:var(--bg);overflow:hidden}
+.pk-gh{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.pk-gh input,.pk-item input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.pk-gname{flex:1;min-width:0;font-weight:800}
+.pk-gcount{font-size:.78rem;color:var(--muted);font-weight:700;white-space:nowrap}
+.pk-toggle{border:0;background:none;color:var(--accent);font-weight:700;font-size:.8rem;padding:4px 6px;white-space:nowrap}
+.pk-items{list-style:none;margin:0;padding:0 8px 8px;display:flex;flex-direction:column;gap:4px}
+.pk-item{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border-radius:10px;padding:8px 10px}
+.pk-item label{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;cursor:pointer}
+.pk-item .t{flex:1;min-width:0;display:flex;flex-direction:column}
+.pk-item .f{font-weight:700;font-size:.9rem;word-break:break-word}
+.pk-item .b{font-size:.76rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-badge{font-size:.68rem;font-weight:800;border-radius:999px;padding:1px 8px;white-space:nowrap;flex:none}
+.pk-badge.new{background:var(--accent-soft);color:var(--accent)}
+.pk-badge.over{background:color-mix(in srgb,#d8a227 22%,transparent);color:#9a6b00}
 .drive-box{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
 #drive-files li{align-items:center;padding:8px 8px 8px 12px;gap:8px}
 #drive-files .df-name{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -500,8 +523,8 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
         <ul class="list" id="drive-files" hidden></ul>
       </div>
       <div class="row wrap">
-        <button class="btn grow" id="export" type="button">バックアップを書き出す</button>
-        <button class="btn grow" id="import" type="button">バックアップを読み込む</button>
+        <button class="btn grow" id="export" type="button">えらんで書き出す</button>
+        <button class="btn grow" id="import" type="button">ファイルから読み込む</button>
         <input type="file" id="import-file" accept="application/json,.json" hidden>
       </div>
       <button class="btn danger" id="clear-all-data" type="button">すべてのカードを消去</button>
@@ -621,6 +644,31 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
 </nav>
 
 <div class="toast" id="toast" hidden role="status" aria-live="polite"><span id="toast-text"></span><button type="button" id="toast-act" hidden></button></div>
+<!-- データをえらぶ（書き出す・読み込むカードをえらぶ） -->
+<div class="dlg-back" id="picker" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pk-title">
+    <div class="sheet-head">
+      <div class="grow">
+        <div class="pk-title" id="pk-title"></div>
+        <div class="muted small" id="pk-sub"></div>
+      </div>
+      <button class="ibtn ico-only" id="pk-close" type="button" aria-label="閉じる">✕</button>
+    </div>
+    <input type="search" id="pk-q" placeholder="見出し・本文でさがす" autocomplete="off" aria-label="カードをさがす">
+    <div class="row wrap" style="gap:6px">
+      <button class="ibtn" id="pk-all" type="button">全部えらぶ</button>
+      <button class="ibtn" id="pk-none" type="button">全部はずす</button>
+      <button class="ibtn" id="pk-shown" type="button">見えているものだけえらぶ</button>
+    </div>
+    <div class="pk-groups" id="pk-groups"></div>
+    <label class="switch small" id="pk-opt-wrap" hidden><span id="pk-opt-label"></span><input type="checkbox" id="pk-opt"></label>
+    <div class="row">
+      <button class="btn ghost" id="pk-cancel" type="button">やめる</button>
+      <button class="btn primary grow" id="pk-ok" type="button"></button>
+    </div>
+  </div>
+</div>
+
 <div class="dlg-back" id="dlg" hidden>
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-text">
     <p id="dlg-text"></p>
@@ -2477,15 +2525,111 @@ $("s-test").onclick=()=>{
 $("s-theme").onchange=()=>{state.prefs.theme=$("s-theme").value;savePrefs();applyTheme()};
 
 /* ---------- データ ---------- */
+/* =========================================================
+   データをえらぶ画面（カテゴリごとにまとめて、チェックでえらぶ）
+   ========================================================= */
+const picker={items:[],sel:new Set(),open:new Set(),q:"",onOk:null};
+function openPicker(o){
+  picker.items=o.items;                       // [{key,f,b,c,badge}]
+  picker.sel=new Set(o.items.filter(x=>o.defaultOn?o.defaultOn(x):true).map(x=>x.key));
+  picker.open=new Set();picker.q="";picker.onOk=o.onOk;picker.okLabel=o.okLabel;
+  $("pk-title").textContent=o.title;
+  $("pk-sub").textContent=o.sub||"";
+  $("pk-q").value="";
+  $("pk-opt-wrap").hidden=!o.option;
+  if(o.option){$("pk-opt-label").textContent=o.option.label;$("pk-opt").checked=!!o.option.checked}
+  // カテゴリが1つだけ、または少ないときは中身を開いておく
+  const cats=[...new Set(o.items.map(x=>x.c||"未分類"))];
+  if(cats.length===1||o.items.length<=20)cats.forEach(c=>picker.open.add(c));
+  renderPicker();
+  $("picker").hidden=false;
+}
+function closePicker(){$("picker").hidden=true;picker.onOk=null}
+function pickerShown(){
+  const q=picker.q.trim().toLowerCase();
+  return picker.items.filter(x=>!q||(x.f+"\n"+x.b+"\n"+(x.c||"")).toLowerCase().includes(q));
+}
+function renderPicker(){
+  const box=$("pk-groups");const keepTop=box.scrollTop;box.innerHTML="";
+  const shown=pickerShown();
+  const groups=new Map();
+  for(const x of shown){const k=x.c||"未分類";if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x)}
+  const searching=!!picker.q.trim();
+  for(const [cat,list] of [...groups.entries()].sort((a,b)=>b[1].length-a[1].length)){
+    const g=document.createElement("div");g.className="pk-group";
+    const gh=document.createElement("div");gh.className="pk-gh";
+    const cb=document.createElement("input");cb.type="checkbox";
+    const nOn=list.filter(x=>picker.sel.has(x.key)).length;
+    cb.checked=nOn===list.length;cb.indeterminate=nOn>0&&nOn<list.length;
+    cb.setAttribute("aria-label",`${cat}をまとめてえらぶ`);
+    cb.onchange=()=>{list.forEach(x=>cb.checked?picker.sel.add(x.key):picker.sel.delete(x.key));renderPicker()};
+    const nm=document.createElement("span");nm.className="pk-gname";nm.textContent=cat;
+    const ct=document.createElement("span");ct.className="pk-gcount";ct.textContent=`${nOn}/${list.length}枚`;
+    const isOpen=searching||picker.open.has(cat);
+    const tg=document.createElement("button");tg.type="button";tg.className="pk-toggle";tg.textContent=isOpen?"とじる":"1枚ずつえらぶ";
+    tg.onclick=()=>{picker.open.has(cat)?picker.open.delete(cat):picker.open.add(cat);renderPicker()};
+    gh.append(cb,nm,ct);if(!searching)gh.append(tg);
+    g.append(gh);
+    if(isOpen){
+      const ul=document.createElement("ul");ul.className="pk-items";
+      for(const x of list){
+        const li=document.createElement("li");li.className="pk-item";
+        const lab=document.createElement("label");
+        const c2=document.createElement("input");c2.type="checkbox";c2.checked=picker.sel.has(x.key);
+        c2.onchange=()=>{c2.checked?picker.sel.add(x.key):picker.sel.delete(x.key);renderPicker()};
+        const t=document.createElement("span");t.className="t";
+        const f=document.createElement("span");f.className="f";f.textContent=x.f||"（見出しなし）";
+        const b=document.createElement("span");b.className="b";b.textContent=String(x.b||"").replace(/\s+/g," ").slice(0,80);
+        t.append(f,b);lab.append(c2,t);li.append(lab);
+        if(x.badge){const bd=document.createElement("span");bd.className="pk-badge "+(x.badge==="上書き"?"over":"new");bd.textContent=x.badge;li.append(bd)}
+        ul.append(li);
+      }
+      g.append(ul);
+    }
+    box.append(g);
+  }
+  if(!shown.length){const d=document.createElement("div");d.className="muted small";d.style.padding="12px";d.textContent="見つかりませんでした";box.append(d)}
+  box.scrollTop=keepTop;
+  const n=picker.sel.size;
+  $("pk-ok").textContent=n?`えらんだ${n}枚を${picker.okLabel}`:"カードをえらんでください";
+  $("pk-ok").disabled=!n;
+}
+$("pk-q").oninput=()=>{picker.q=$("pk-q").value;renderPicker()};
+$("pk-all").onclick=()=>{picker.items.forEach(x=>picker.sel.add(x.key));renderPicker()};
+$("pk-none").onclick=()=>{picker.sel.clear();renderPicker()};
+$("pk-shown").onclick=()=>{picker.sel=new Set(pickerShown().map(x=>x.key));renderPicker()};
+$("pk-close").onclick=closePicker;
+$("pk-cancel").onclick=closePicker;
+$("picker").addEventListener("click",e=>{if(e.target===$("picker"))closePicker()});
+$("pk-ok").onclick=()=>{
+  const keys=new Set(picker.sel);const fn=picker.onOk;const opt=$("pk-opt").checked;
+  closePicker();
+  if(fn)fn(keys,opt);
+};
+
+/* ---------- 書き出す（えらんだカードだけをファイルに） ---------- */
 $("export").onclick=()=>{
-  const data={app:"narreji",v:1,exportedAt:new Date().toISOString(),cards:liveCards(),prefs:state.prefs};
-  const blob=new Blob([JSON.stringify(data,null,1)],{type:"application/json"});
-  const a=document.createElement("a");
-  const d=new Date();
-  a.href=URL.createObjectURL(blob);
-  a.download=`narreji-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`;
-  document.body.append(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  const live=liveCards().sort((a,b)=>(a.cr-b.cr)||(a.id<b.id?-1:1));
+  if(!live.length){toast("書き出すカードがありません");return}
+  openPicker({
+    title:"書き出すカードをえらぶ",
+    sub:`全部で${live.length}枚。カテゴリごとにまとめてえらべます`,
+    items:live.map(c=>({key:c.id,f:c.f,b:c.b,c:c.c})),
+    okLabel:"書き出す",
+    option:{label:"朗読の設定（声・速さ・読み方の変換など）もいっしょに保存する",checked:true},
+    onOk:(keys,withPrefs)=>{
+      const cards=live.filter(c=>keys.has(c.id));
+      const data={app:"narreji",v:1,exportedAt:new Date().toISOString(),cards};
+      if(withPrefs)data.prefs=state.prefs;
+      const cats=[...new Set(cards.map(c=>c.c||"未分類"))];
+      const d=new Date();
+      const ymd=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+      const part=cards.length===live.length?"":(cats.length===1?`_${safeName(cats[0])}`:`_${cards.length}枚`);
+      const name=`narreji${part}_${ymd}.json`;
+      downloadBlob(new Blob([JSON.stringify(data,null,1)],{type:"application/json"}),name);
+      toast(`${cards.length}枚を書き出しました：${name}`);
+    }
+  });
 };
 $("import").onclick=()=>$("import-file").click();
 $("import-top").onclick=()=>$("import-file").click();
@@ -2496,21 +2640,35 @@ $("import-file").onchange=async e=>{
   try{data=JSON.parse(await f.text())}catch(err){toast("読み込めませんでした（JSON形式ではありません）");return}
   importCardsData(data);
 };
+/* ---------- 読み込む（中身を見て、えらんだカードだけを入れる） ---------- */
 function importCardsData(data,label){
   const incoming=sanitizeCards(normalizeImported(Array.isArray(data)?data:data&&data.cards)).filter(c=>!c.del);
   if(!incoming.length){toast("カードが見つかりませんでした");return}
-  const byCat={};incoming.forEach(c=>{const k=c.c||"未分類";byCat[k]=(byCat[k]||0)+1});
-  const catLine=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`${k} ${n}`).join("・");
-  const dup=incoming.filter(c=>state.cards.some(x=>x.id===c.id&&!x.del)).length;
-  ask(`${label?label+"\n":""}${incoming.length}件のカードを読み込みますか？\n（${catLine}）${dup?`\n\nそのうち${dup}件は、すでにあるカードを読み込んだ内容で上書きします。`:""}`,"読み込む",()=>{
-    const t=now();
-    for(const c of incoming){
-      c.u=t;
-      const i=state.cards.findIndex(x=>x.id===c.id);
-      if(i>=0)state.cards[i]=c;else state.cards.push(c);
+  const exists=id=>state.cards.some(x=>x.id===id&&!x.del);
+  const dup=incoming.filter(c=>exists(c.id)).length;
+  const hasPrefs=!!(data&&!Array.isArray(data)&&data.prefs&&typeof data.prefs==="object"&&data.app==="narreji");
+  openPicker({
+    title:"読み込むカードをえらぶ",
+    sub:`${label?label+"・":""}${incoming.length}枚${dup?`（そのうち${dup}枚はすでにあるので上書き）`:""}`,
+    items:incoming.map(c=>({key:c.id,f:c.f,b:c.b,c:c.c,badge:exists(c.id)?"上書き":"新規"})),
+    okLabel:"読み込む",
+    option:hasPrefs?{label:"ファイルに入っている朗読の設定（声・速さ・読み方の変換など）も読み込む",checked:false}:null,
+    onOk:(keys,withPrefs)=>{
+      const t=now();
+      const chosen=incoming.filter(c=>keys.has(c.id));
+      for(const c of chosen){
+        c.u=t;
+        const i=state.cards.findIndex(x=>x.id===c.id);
+        if(i>=0)state.cards[i]=c;else state.cards.push(c);
+      }
+      save();
+      if(withPrefs&&hasPrefs){
+        state.prefs={...DEFAULT_PREFS,...data.prefs,mv:2};savePrefs();
+        applyTheme();applyTtsOptsUI();if(!$("tab-settings").hidden)applySettingsUI();
+      }
+      buildOrder();renderCard();renderList();
+      toast(`${chosen.length}枚を読み込みました`,"学習で見る",()=>openInStudy(chosen[0].id));
     }
-    save();buildOrder();renderCard();renderList();
-    toast(`${incoming.length}件を読み込みました`,"学習で見る",()=>openInStudy(incoming[0].id));
   });
 }
 $("clear-all-data").onclick=()=>{
