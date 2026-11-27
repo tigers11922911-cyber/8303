@@ -75,6 +75,7 @@ header.top h1{font-size:1.05rem;margin:0;font-weight:800;letter-spacing:.02em;fl
   display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);
   border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700;color:var(--muted);white-space:nowrap;
 }
+.help-link{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:.75rem;font-weight:700;color:var(--accent);text-decoration:none;white-space:nowrap}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .sync-pill[data-s="ok"] .sync-dot{background:var(--ok)}
 .sync-pill[data-s="busy"] .sync-dot,.sync-pill[data-s="pending"] .sync-dot{background:#d8a227}
@@ -226,6 +227,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <body>
 <header class="top">
   <h1 id="app-title">ナレジ 朗読カード</h1>
+  <a class="help-link" href="manual/" title="使い方（マニュアル）">使い方</a>
   <button class="sync-pill" id="sync-pill" type="button" data-s="off" title="同期の状態"><span class="sync-dot"></span><span id="sync-pill-text">同期オフ</span></button>
 </header>
 
@@ -382,6 +384,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <input type="file" id="import-file" accept="application/json,.json" hidden>
       </div>
       <button class="btn danger" id="clear-all-data" type="button">すべてのカードを消去</button>
+      <a class="btn" href="manual/">使い方（マニュアル）を見る</a>
       <div class="muted small" id="app-ver"></div>
     </div>
   </section>
