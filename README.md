@@ -1,6 +1,21 @@
 # 8303
 
+公開中のアプリ（GitHub Pages：`https://tigers11922911-cyber.github.io/8303/`）
+
+| アプリ | 場所 | 開くアドレス |
+| --- | --- | --- |
+| まーとん酒場（車中泊・温泉・酒場スポットマップ） | `index.html` | `/8303/` |
+| ナレジ 朗読カード（単語帳） | [`narreji/`](narreji/) | `/8303/narreji/` |
+| 計画相談データ転記・反映アプリ（PWA） | [`keikaku-soudan/`](keikaku-soudan/) | `/8303/keikaku-soudan/` |
+| 計画相談 様式アプリ | [`keikaku/`](keikaku/) | `/8303/keikaku/` |
+
 📖 GitHubでアプリをネットに公開するしかた（小学生向けマニュアル）：スマホ版 `manual/github.html`／MacBook版 `manual/github-mac.html`
+
+`main` に変更が入ると、`.github/workflows/pages-deploy.yml` が自動で GitHub Pages に公開します。
+
+---
+
+# まーとん酒場（`index.html`）
 
 まーとん酒場 — 車中泊・温泉・酒場スポットマップ（`index.html` 単一ファイルのSPA）。
 
@@ -53,3 +68,17 @@
 4. 発行されたウェブアプリのURLと合言葉を、各端末の「設定」→「同期」に入れて「今すぐ同期」を押します。
 
 データは自分の Googleドライブの `narreji-sync.json` に保存されます。カードごとに新しく更新された方が採用され、削除も他の端末に伝わります。
+
+---
+
+# 計画相談データ転記・反映アプリ（`keikaku-soudan/`）
+
+項目名と書き方（記入例）をAIが読み取り、計画相談のExcelの「入力内容」欄へ自動で反映するアプリです（PWA）。使い方は [keikaku-soudan/README.md](keikaku-soudan/README.md)。
+
+---
+
+# 計画相談 様式アプリ（`keikaku/`）
+
+相談支援従事者初任者研修の提出課題①〜⑨・送付票・同意書・実習報告書を、1回の入力から作るアプリです。Googleドライブの入力フォーム付きPDFに書き込みます。詳しくは [keikaku/CLAUDE.md](keikaku/CLAUDE.md)。
+
+※ 様式のPDFは claude.ai のアーティファクト経由で Googleドライブから読み込むため、GitHub Pages 版では入力・保存・データの書き出しはできますが、PDFの作成はできません。

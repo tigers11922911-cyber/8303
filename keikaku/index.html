@@ -1,0 +1,882 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>計画相談 様式アプリ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* レイアウト：上に見出しと様式のタブ、下に入力欄のカード。様式の一覧（ハブ）から PDF を作る */
+:root{
+  --bg:#ecefe9; --card:#ffffff; --sunk:#f5f7f3; --ink:#1f2a26; --muted:#5f6d67; --line:#d3dad3;
+  --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#d9f0ec;
+  --plan:#4338ca; --plan-soft:#e3e4fb; --warm:#9a5b1e; --warm-soft:#f6ead9;
+  --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+  --font:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Sans','Yu Gothic',sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --card:#1a211e; --sunk:#151b18; --ink:#e4ebe7; --muted:#9aa9a2; --line:#2e3a35;
+  --accent:#2dd4bf; --accent-ink:#06201c; --accent-soft:#12332e; --plan:#a5b4fc; --plan-soft:#25264a; --warm:#f0b97a; --warm-soft:#3a2a18;
+  --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --card:#1a211e; --sunk:#151b18; --ink:#e4ebe7; --muted:#9aa9a2; --line:#2e3a35;
+  --accent:#2dd4bf; --accent-ink:#06201c; --accent-soft:#12332e; --plan:#a5b4fc; --plan-soft:#25264a; --warm:#f0b97a; --warm-soft:#3a2a18;
+  --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-weight:500;letter-spacing:.03em;line-height:1.6;font-size:15px;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+h1,h2,h3{font-weight:900;text-wrap:balance;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:10px;padding-block:10px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;min-width:0;flex:1 1 260px}
+.brand h1{font-size:18px;letter-spacing:.06em}
+.brand small{color:var(--muted);font-size:12px}
+.case-chip{display:flex;align-items:center;gap:6px;border:2px solid var(--accent);color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer;max-width:100%}
+.case-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:15em}
+.status{font-size:12px;color:var(--muted);white-space:nowrap}
+@media (max-width:600px){.brand small{display:none}.brand h1{font-size:16px}.bar{gap:6px 10px;padding-block:8px}.case-chip span{max-width:11em}.status{flex-basis:100%;order:3}}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}
+nav.tabs button{flex:none;border:0;background:transparent;padding:7px 12px;border-radius:10px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+main{padding-block:16px 80px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card > header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.card h2{font-size:17px}
+.card .lead{color:var(--muted);font-size:13px;margin:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px 14px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f.wide{grid-column:1/-1}
+.f label,.f .lab{font-size:13px;font-weight:700;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.f .hint{font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{width:100%;border:1.5px solid var(--line);background:var(--sunk);border-radius:10px;padding:8px 10px;font-size:16px;min-width:0}
+textarea{resize:vertical;line-height:1.6;min-height:64px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);background:var(--card)}
+.ymd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ymd input{width:4.2em;text-align:center}
+.chk{display:flex;align-items:flex-start;gap:8px;font-size:14px;cursor:pointer}
+.chk input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.to{display:inline-flex;gap:3px;flex-wrap:wrap}
+.to i{font-style:normal;font-size:11px;font-weight:700;border-radius:6px;padding:0 5px;background:var(--plan-soft);color:var(--plan);line-height:1.6}
+.count{font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.count.over{color:var(--warn);font-weight:700}
+.btn{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.plan{background:var(--plan);border-color:var(--plan);color:var(--card)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--accent)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:wait}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.banner{background:var(--warm-soft);color:var(--warm);border-radius:var(--r);padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-weight:700}
+.banner p{margin:0;flex:1;min-width:12em}
+/* 様式の一覧 */
+.forms-group h3{font-size:14px;color:var(--muted);margin:6px 0}
+.form-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px 14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.form-row:first-of-type{border-top:0}
+.no{min-width:3.2em;height:2.4em;padding:0 8px;border-radius:10px;background:var(--plan-soft);color:var(--plan);font-weight:900;display:flex;align-items:center;justify-content:center;font-size:15px}
+.form-row .name{font-weight:700}
+.meter{height:8px;border-radius:99px;background:var(--sunk);border:1px solid var(--line);overflow:hidden;margin-top:6px;max-width:320px}
+.meter b{display:block;height:100%;background:var(--accent)}
+.form-row .sub{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.form-row .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.fieldlist{grid-column:1/-1;background:var(--sunk);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.fl{display:grid;grid-template-columns:minmax(8em,14em) minmax(0,1fr);gap:4px 12px;align-items:start;padding-block:6px;border-top:1px dashed var(--line)}
+.fl:first-child{border-top:0}
+.fl .k{font-size:12.5px;font-weight:700}
+.fl .k small{display:block;color:var(--muted);font-weight:500;font-size:11px}
+.fl textarea{min-height:38px;font-size:14px;padding:6px 8px}
+.fl textarea.ov{border-color:var(--warm);background:var(--warm-soft)}
+.fl .auto{font-size:13px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+@media (max-width:640px){.form-row{grid-template-columns:auto minmax(0,1fr)}.form-row .acts{grid-column:1/-1;justify-content:flex-start}.fl{grid-template-columns:1fr}}
+/* 表の入力 */
+.sub-card{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--sunk)}
+.sub-card > .t{font-weight:900;font-size:14px;display:flex;gap:8px;align-items:center}
+.cols5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:760px){.cols5{grid-template-columns:1fr 1fr}}
+@media (max-width:420px){.cols5{grid-template-columns:1fr}}
+.cols5 textarea,.cols7 textarea{min-height:52px;font-size:14px;background:var(--card)}
+.mini{font-size:11.5px;color:var(--muted);font-weight:700}
+details.dom{border:1px solid var(--line);border-radius:12px;background:var(--card)}
+details.dom > summary{cursor:pointer;padding:10px 12px;font-weight:900;list-style:none;display:flex;justify-content:space-between;gap:8px}
+details.dom > summary::after{content:"＋";color:var(--accent)}
+details.dom[open] > summary::after{content:"－"}
+details.dom .body{padding:0 12px 12px;display:flex;flex-direction:column;gap:12px}
+.cols7{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+/* 週間 */
+.blk{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:8px;align-items:center;padding-block:8px;border-top:1px solid var(--line)}
+.blk:first-child{border-top:0}
+.days{display:flex;gap:3px}
+.days button{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);font-weight:700;cursor:pointer;font-size:13px}
+.days button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hours{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.hours select{width:auto;padding:6px}
+@media (max-width:720px){.blk{grid-template-columns:1fr auto}.blk .days{grid-column:1/-1}.blk input[type=text]{grid-column:1/-1}}
+.wk-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table.wk{border-collapse:collapse;font-size:11.5px;min-width:640px;width:100%}
+table.wk th,table.wk td{border:1px solid var(--line);padding:2px 4px;text-align:left;vertical-align:top}
+table.wk th{background:var(--sunk);font-weight:700;position:sticky;top:0}
+table.wk td.h{background:var(--sunk);text-align:right;color:var(--muted);width:3.2em;font-variant-numeric:tabular-nums}
+table.wk td.on{background:var(--accent-soft)}
+table.wk td.cont{color:var(--muted)}
+/* モーダル */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(10,20,16,.55);display:flex;align-items:flex-end;justify-content:center;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
+@media (min-width:700px){.modal{align-items:center;padding:24px}}
+.sheet{background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:880px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+@media (min-width:700px){.sheet{border-radius:18px}}
+.sheet > header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.sheet > header h2{font-size:16px;flex:1;min-width:0}
+.sheet .content{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.sheet > footer{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pages{display:flex;flex-direction:column;gap:12px;align-items:center;background:var(--sunk);padding:12px;border-radius:12px}
+.pages canvas{max-width:100%;height:auto;box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
+.note{font-size:13px;color:var(--muted);margin:0}
+.note.warn{color:var(--warn);font-weight:700}
+.note.bad{color:var(--bad);font-weight:700}
+.list{display:flex;flex-direction:column;gap:6px}
+.list button.item{display:flex;justify-content:space-between;gap:8px;text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;cursor:pointer}
+.list button.item[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.list .item small{color:var(--muted)}
+.crumb{display:flex;gap:4px;flex-wrap:wrap;font-size:13px}
+.crumb button{border:0;background:transparent;color:var(--accent);font-weight:700;cursor:pointer;padding:2px 4px;text-decoration:underline}
+.crumb button:last-child{text-decoration:none;color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--card);padding:10px 16px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:90vw;text-align:center}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+.num{font-variant-numeric:tabular-nums}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand"><h1>計画相談 様式アプリ</h1><small>一度の入力で、提出課題①〜⑨と送付票・同意書・実習報告書に反映</small></div>
+      <button class="case-chip" id="caseChip" type="button" aria-label="ケースを切り替える">👤 <span id="caseName">ケース</span> ▾</button>
+      <span class="status" id="status">この端末に自動保存</span>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="入力の種類"></nav>
+  </div>
+</header>
+<div class="wrap"><main id="main"></main></div>
+
+<div class="modal" id="modal" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <header><h2 id="mTitle"></h2><button class="btn ghost small" id="mClose" type="button">閉じる</button></header>
+  <div class="content" id="mBody"></div>
+  <footer id="mFoot"></footer>
+</div></div>
+<input type="file" id="filePick" accept="application/pdf,.pdf" hidden>
+<input type="file" id="jsonPick" accept="application/json,.json" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="forms.js"></script>
+<script src="sample.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const clone = o => JSON.parse(JSON.stringify(o));
+const KEIKAKU_FOLDER = { id: '1gypJAOgYIW-B-tq_N-YbeItiNq0V0NYs', name: '計画相談' };
+const LS = 'keikaku_soudan_v1';
+const RM = KS.reflectMap();
+
+// ============ 保存データ ============
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+};
+let S = null;
+const newId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function newCase(data, sample) { return { id: newId(), data: data || {}, at: new Date().toISOString(), sample: !!sample }; }
+function cur() { return S.cases.find(c => c.id === S.cur) || S.cases[0]; }
+function D() { return cur().data; }
+function normalize(d) {
+  if (!Array.isArray(d.pri)) d.pri = [];
+  while (d.pri.length < 6) d.pri.push({});
+  d.pri.forEach((p, i) => { if (!p || typeof p !== 'object') d.pri[i] = {}; });
+  ['supPub', 'supOth'].forEach(k => { if (!d[k] || typeof d[k] !== 'object') d[k] = {}; });
+  ['wkPlan', 'wkNow'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  if (!Array.isArray(d.send)) d.send = [];
+  if (!d.ov || typeof d.ov !== 'object') d.ov = {};
+  return d;
+}
+function loadLocal() {
+  try { S = JSON.parse(store.get(LS) || 'null'); } catch (e) { S = null; }
+  if (!S || !Array.isArray(S.cases) || !S.cases.length) {
+    const c = newCase(clone(window.KS_SAMPLE), true);
+    S = { cases: [c], cur: c.id, tab: 'ichiran' };
+  }
+  S.cases.forEach(c => normalize(c.data));
+  if (!S.cases.some(c => c.id === S.cur)) S.cur = S.cases[0].id;
+}
+let saveTimer = null, dirty = new Set();
+function touch() {
+  const c = cur(); c.at = new Date().toISOString(); dirty.add(c.id);
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 800);
+  setStatus('保存しています…');
+}
+function saveNow() {
+  const ok = store.set(LS, JSON.stringify(S));
+  if (cloud) cloudPush(); else setStatus(ok ? 'この端末に保存しました' : '⚠ この画面では端末に保存できません。「データ」から書き出してください');
+}
+function setStatus(t) { $('status').textContent = t; }
+function caseLabel(c) { const d = c.data || {}; return [d.initial, d.caseTitle].filter(Boolean).join('　') || '名前のないケース'; }
+
+// ---- クラウド（claude.ai の保存領域・本人だけが読める場所） ----
+let cloud = null;
+async function cloudInit() {
+  try {
+    if (!window.claude || typeof window.claude.use !== 'function') return;
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) return;
+    const uid = await user.id(); if (!uid) return;
+    const col = db.collection('data/users/' + uid);
+    cloud = { col };
+    setStatus('保存データを確認しています…');
+    const snap = await col.get();
+    const remote = {};
+    snap.docs.forEach(doc => { if (doc.id.startsWith('case-')) { const v = doc.data(); if (v && v.id) remote[v.id] = v; } });
+    let changed = false;
+    Object.values(remote).forEach(r => {
+      const i = S.cases.findIndex(c => c.id === r.id);
+      if (i < 0) { if (!r.deleted) { S.cases.push({ id: r.id, data: normalize(r.data || {}), at: r.at, sample: !!r.sample }); changed = true; } }
+      else if ((r.at || '') > (S.cases[i].at || '')) {
+        if (r.deleted) S.cases.splice(i, 1); else S.cases[i] = { id: r.id, data: normalize(r.data || {}), at: r.at, sample: !!r.sample };
+        changed = true;
+      }
+    });
+    S.cases.forEach(c => { if (!remote[c.id] || (c.at || '') > (remote[c.id].at || '')) dirty.add(c.id); });
+    if (!S.cases.length) { const c = newCase(clone(window.KS_SAMPLE), true); S.cases.push(c); }
+    if (!S.cases.some(c => c.id === S.cur)) S.cur = S.cases[0].id;
+    if (changed) { store.set(LS, JSON.stringify(S)); renderAll(); toast('ほかの端末で保存した内容を読み込みました'); }
+    cloudPush();
+  } catch (e) { cloud = null; setStatus('この端末に自動保存'); }
+}
+let pushing = false;
+async function cloudPush() {
+  if (!cloud || pushing) return;
+  pushing = true;
+  try {
+    while (dirty.size) {
+      const id = [...dirty][0]; dirty.delete(id);
+      const c = S.cases.find(x => x.id === id);
+      const body = c ? { id: c.id, at: c.at, sample: !!c.sample, name: caseLabel(c), data: c.data } : { id, at: new Date().toISOString(), deleted: true };
+      await cloud.col.doc('case-' + id).set(body);
+    }
+    setStatus('☁ 保存しました（ほかの端末でも開けます）');
+  } catch (e) { setStatus('この端末に保存しました（クラウドには保存できませんでした）'); }
+  finally { pushing = false; }
+}
+
+// ============ 値の読み書き ============
+function getPath(o, path) { return path.split('.').reduce((a, k) => a == null ? undefined : a[k], o); }
+function setPath(o, path, v) {
+  const ks = path.split('.'); let a = o;
+  ks.slice(0, -1).forEach((k, i) => { if (a[k] == null || typeof a[k] !== 'object') a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; });
+  a[ks[ks.length - 1]] = v;
+}
+
+// ============ 入力欄の定義 ============
+const T = (k, l, o = {}) => ({ k, l, t: 'text', ...o });
+const A = (k, l, o = {}) => ({ k, l, t: 'area', rows: 3, ...o });
+const SEL = (k, l, opts, o = {}) => ({ k, l, t: 'sel', opts, ...o });
+const YMD = (k, l) => ({ k, l, t: 'ymd' });
+const CHK = (k, l, o = {}) => ({ k, l, t: 'chk', ...o });
+const OPT = {
+  kubun: ['非該当', '障害支援区分 1', '障害支援区分 2', '障害支援区分 3', '障害支援区分 4', '障害支援区分 5', '障害支援区分 6', '申請中', '障害児（区分なし）'],
+  handbook: ['身体障害者手帳 1級', '身体障害者手帳 2級', '身体障害者手帳 3級', '療育手帳 Ⓐ（最重度）', '療育手帳 A（重度）', '療育手帳 Ⓑ（中度）', '療育手帳 B（軽度）', '精神障害者保健福祉手帳 1級', '精神障害者保健福祉手帳 2級', '精神障害者保健福祉手帳 3級', '手帳なし'],
+  copay: ['0円', '4,600円', '9,300円', '37,200円'],
+  monitor: ['毎月', '3か月ごと', '6か月ごと']
+};
+const TABS = [
+  { id: 'ichiran', label: '様式の一覧' },
+  { id: 'kihon', label: '基本情報' },
+  { id: 'gaiyou', label: '本人の状況' },
+  { id: 'stretch', label: 'ストレングス' },
+  { id: 'asmt', label: 'アセスメント' },
+  { id: 'needs', label: 'ニーズ整理' },
+  { id: 'plan', label: '計画案' },
+  { id: 'week', label: '週間・生活' },
+  { id: 'shigen', label: '社会資源' },
+  { id: 'teishutsu', label: '提出書類' },
+  { id: 'data', label: 'データ' }
+];
+const SECTIONS = {
+  kihon: [
+    { t: '受講者', lead: '各様式の右上（受講番号・氏名）や送付票に入ります。', f: [
+      T('tNo', '受講番号', { ph: '08-1234' }), T('tName', '受講者氏名'), T('tOrg', '所属機関・法人名・事業所名', { wide: true }),
+      T('mgrOrg', '所属長の所属機関・法人名（送付票の下の欄）', { wide: true, hint: '空欄なら上の所属機関が入ります' }), T('mgrName', '所属長・事業所管理者の職・氏名'),
+      CHK('printSelf', '「自署」と書かれた欄（送付票の氏名・同意書の説明者など）にも印字する', { wide: true, hint: '通常は手書きします。チェックしなければ空欄のままです。' })
+    ] },
+    { t: '計画の情報', f: [
+      T('agency', '相談支援事業者名'), T('planner', '計画作成担当者'), T('made', '作成日（計画案作成日）', { ph: '令和8年11月23日' }),
+      T('planStart', '計画開始年月', { ph: '令和8年12月' }), T('monitor', 'モニタリング期間（開始年月）', { opts: OPT.monitor, ph: '毎月（令和8年12月〜）' })
+    ] },
+    { t: '利用者', lead: '個人が特定されないよう、氏名・住所はイニシャルで書きます。', f: [
+      T('initial', '氏名（イニシャル）', { ph: 'Y.T' }), T('kana', 'ふりがな（③）'), T('age', '年齢', { ph: '28' }),
+      SEL('sex', '性別', ['', '男', '女']), SEL('era', '生年の元号', ['', 'T', 'S', 'H'], { hint: '⑦では〇で囲みます' }), T('birthYr', '生年（元号の年）', { ph: '10' }),
+      T('address', '住所（③）', { ph: '茨城県那珂市' }), T('city', '住所 市町村のイニシャル（⑦）', { ph: 'N' }),
+      SEL('housing', '住まい（⑦では〇で囲みます）', ['', '持家', '借家', 'グループ/ケアホーム', '入所施設', '医療機関', 'その他']), T('housingOther', '住まい「その他」の内容'),
+      T('contact', '連絡先（③）'), T('tel', '電話番号（⑦）'), T('fax', 'FAX番号（⑦）'),
+      T('famShort', '家族構成（①の1行欄）', { wide: true, ph: '母（68歳）と2人暮らし' }), T('residYears', '現在の地域の居住歴（年）', { ph: '28' })
+    ] },
+    { t: '障害・制度', f: [
+      T('handbook', '手帳の種類・等級', { opts: OPT.handbook, wide: true }), T('kubun', '障害支援区分', { opts: OPT.kubun }), T('disease', '障害または疾患名'),
+      T('jukyuNo', '障害福祉サービス受給者証番号'), T('copay', '利用者負担上限額', { opts: OPT.copay }), T('chiikiNo', '地域相談支援受給者証番号'), T('tsushoNo', '通所受給者証番号')
+    ] }
+  ],
+  gaiyou: [
+    { t: '事例', f: [T('caseTitle', '事例タイトル（約20字）', { wide: true, max: 30 }), A('overview', '概要（支援経過・現状と課題等）', { wide: true, rows: 5 })] },
+    { t: '生活歴・医療', f: [
+      A('lifeHist', '生活歴', { wide: true, rows: 4 }), A('medHist', '病歴・受診歴', { wide: true, hint: '③⑦では生活歴の後ろに続けて入ります' }),
+      A('medStatus', '医療の状況（受診科目、頻度、主治医、疾患名、服薬状況等）', { wide: true })
+    ] },
+    { t: '本人・家族の思い', lead: '本人の主訴・家族の主訴は ③⑤⑦ にも入ります。様式ごとに言い回しを変えたいときは各タブの欄に書いてください。', f: [
+      A('wishSelf', '本人の主訴（意向・希望・希望するくらし）', { wide: true }), A('wishFamily', '家族の主訴（意向・希望）', { wide: true }),
+      A('desiredLife', '①の「望んでいる暮らし、訴え、困っていること」', { wide: true, hint: '空欄なら本人の主訴が入ります' }),
+      A('consultBg', '相談に至る経緯', { wide: true })
+    ] },
+    { t: '①の見立て', f: [A('issues', '本人や家族の問題', { wide: true }), A('abilityEnv', '本人の能力や環境的問題', { wide: true }), A('hobbies', '本人の趣味趣向、楽しみ、長所', { wide: true }), A('otherNotes', 'その他気が付いたこと', { wide: true })] },
+    { t: '家族・関係する人', f: [A('famDetail', '家族構成（年齢、職業、主たる介護者等）', { wide: true, rows: 4 }), A('socialMap', '社会関係図（本人と関わりを持つ機関・人物等と役割）', { wide: true, rows: 4 })] },
+    { t: '支援の状況（⑦）', w: 'support' }
+  ],
+  stretch: [{ t: 'アセスメントのストレッチ（②）', f: [
+    A('sFirst', '① 最初に大づかみに捉えた本人像・第一印象（端的に）', { wide: true }),
+    A('sPersonality', '② 性格・人柄／個人的特性', { rows: 6 }), A('sTalent', '② 才能・素質', { rows: 6 }),
+    A('sEnv', '② 環境のストレングス', { rows: 6 }), A('sInterest', '② 興味・関心／向上心', { rows: 6 })
+  ] }],
+  asmt: [
+    { t: '本人・家族の要望（③）', lead: '「本人の状況」タブの主訴と同じ欄です。', f: [A('wishSelf', '本人の要望・希望するくらし、困っていること・解決したいこと', { wide: true }), A('wishFamily', '家族の要望・希望するくらし、困っていること・解決したいこと', { wide: true })] },
+    { t: '1日の流れ（③）', lead: '「7:00 起床」のように、1行に1つずつ書きます。様式の時刻の目盛り（6時〜翌3時）の位置に印字されます。', f: [
+      A('tlHopeWd', '希望する一日の流れ（平日）', { rows: 5 }), A('tlHopeHd', '希望する一日の流れ（休日）', { rows: 5 }),
+      A('tlNowWd', '生活状況・普通の1日（平日）', { rows: 5 }), A('tlNowHd', '生活状況・普通の1日（休日）', { rows: 5 }),
+      A('tlOther', 'その他の1日の生活の流れ', { rows: 4 })
+    ] },
+    { t: '本人の概要（③）', f: [A('genogram', 'ジェノグラム（文字で）', { rows: 4 }), A('ecomap', 'エコマップ（文字で）', { rows: 4 })], lead: '生活歴（病歴含む）は「本人の状況」タブの内容が入ります。ジェノグラム・エコマップは図を手で描く場合は空欄のままにしてください。' },
+    { t: '利用者の状況（③ 2〜3頁）', w: 'asmt' },
+    { t: '対応者所見のまとめ（③）', f: [A('asmtSummary', '対応者所見のまとめ（省略せず記入）', { wide: true, rows: 4 })] }
+  ],
+  needs: [{ t: 'ニーズ整理票（④）', f: [
+    A('nWish', 'インテーク：本人の表明している希望・解決したい課題', { rows: 5, hint: '空欄なら本人の主訴が入ります' }), A('nInfo', 'インテーク：（作成者の）おさえておきたい情報', { rows: 5 }),
+    A('nBio', 'アセスメント（本人）：生物的なこと', { rows: 4 }), A('nPsy', 'アセスメント（本人）：心理的なこと', { rows: 4 }),
+    A('nSocial', 'アセスメント（本人）：社会性・対人関係の特徴', { rows: 4 }), A('nEnv', 'アセスメント：環境', { rows: 4 }),
+    A('nHyp2', '理解・解釈・仮説②（専門的アセスメントや他者の解釈・推測）', { rows: 4 }),
+    A('nTask', 'プランニング：支援課題', { rows: 4 }), A('nPolicy', 'プランニング：対応・方針', { rows: 4 }),
+    A('nSummary', '今回大づかみに捉えた本人像（100文字程度で要約）', { wide: true, max: 100 })
+  ] }],
+  plan: [
+    { t: '生活に対する意向（⑤）', f: [
+      A('pWishSelf', '本人', { wide: true, hint: '空欄なら本人の主訴が入ります' }), A('pWishFam', '家族', { wide: true, hint: '空欄なら家族の主訴が入ります' })
+    ] },
+    { t: '方針と目標（⑤）', f: [A('policy', '総合的な援助の方針', { wide: true, rows: 4 }), A('longGoal', '長期目標', { wide: true, rows: 2 }), A('shortGoal', '短期目標', { wide: true, rows: 2 })] },
+    { t: '優先順位ごとの計画（⑤）', w: 'pri' }
+  ],
+  week: [
+    { t: '週間計画表（⑥）：サービスを使った1週間', w: 'wkPlan' },
+    { t: '⑥ のその他の欄', f: [A('mainAct6', '主な日常生活上の活動', { rows: 4 }), A('nonWeekly6', '週単位以外のサービス', { rows: 4 }), A('whole', 'サービス提供によって実現する生活の全体像', { wide: true, rows: 3 })] },
+    { t: '別紙2（⑧）：現在の生活', w: 'wkNow' },
+    { t: '⑧ のその他の欄', f: [A('mainAct8', '主な日常生活上の活動', { rows: 4 }), A('nonWeekly8', '週単位以外のサービス', { rows: 4 })] }
+  ],
+  shigen: [
+    { t: '1 市町村・圏域のデータ（⑨）', f: [
+      T('rCity', '市町村名'), T('rAsOf', '（　年　月現在）', { ph: '令和8年4月' }), T('rPop', '人口（人）'), T('rAging', '高齢化率（％）'), T('rBirth', '合計特殊出生率'), T('rWelfare', '保護率（％）'),
+      T('rPhys', '身体障害者手帳 交付者（人）'), T('rIntel', '療育手帳 交付者（人）'), T('rMental', '精神保健福祉手帳 交付者（人）'),
+      T('rArea', '障害保健福祉圏域名'), T('rHealth', '管轄保健所名'), T('rChild', '管轄児童相談所名'), T('rPension', '管轄年金事務所名'),
+      A('rAreaCities', '障害保健福祉圏域の構成市町村名', { wide: true, rows: 2 }),
+      A('rFeature', '地域の特徴（産業、地理、歴史、特産物など）', { wide: true }), T('rFeatureSrc', '→情報入手先')
+    ] },
+    { t: '2 地域の相談支援体制（⑨）', f: [
+      SEL('rKikan', '基幹相談支援センター', ['', '設置済', '設置予定', '設置検討中', '設置予定なし']), T('rKikanYear', '設置予定（　年度）'),
+      SEL('rKikanForm', '形態', ['', '委託', '直営', 'その他']), SEL('rKikanVisit', '自分の関わり：行ったことが', ['', 'ある', 'ない']), SEL('rKikanLevel', '関わりの度合い（5段階）', ['', '1', '2', '3', '4', '5']),
+      A('rKikanWork', '基幹相談支援センターの業務内容', { wide: true }),
+      SEL('rCityForm', '市町村地域生活支援事業の相談支援 形態', ['', '委託', '直営', 'その他']), T('rCityFormOther', 'その他（　）'), T('rCityCount', '箇所数'),
+      A('rCityWork', '業務内容', { wide: true }), A('rCityOffices', '事業所とその特徴', { wide: true }),
+      T('rPlanCount', '計画相談支援の事業所 箇所数'), T('rPlanChildCount', 'うち指定障害児相談支援事業所'), T('rPlanStaff', '相談員数（人）'), T('rPlanStaffDual', '兼務の相談員数（人）'),
+      A('rPlanFeature', '計画相談支援の事業所の特徴', { wide: true, rows: 2 }),
+      T('rSoTarget', '総合支援法 対象者数（人）'), T('rSoRate', '総合支援法 作成率（％）'), T('rSoSelf', '総合支援法 うちセルフプラン率（％）'),
+      T('rJiTarget', '児童福祉法 対象者数（人）'), T('rJiRate', '児童福祉法 作成率（％）'), T('rJiSelf', '児童福祉法 うちセルフプラン率（％）'),
+      T('rIkou', '指定一般相談 地域移行（箇所）'), T('rTeichaku', '地域定着（箇所）'),
+      A('rIkouWork', '地域における精神科病院からの地域移行の取り組みの概要・検討状況', { wide: true }),
+      A('rKyoten', '地域生活支援拠点の概要・検討状況', { wide: true })
+    ] },
+    { t: '3 地域の自立支援協議会（⑨）', f: [
+      T('rKyogiName', '名称'), SEL('rKyogiForm', '設置形態', ['', '市町村単独', '障害保健福祉圏域', 'その他']),
+      CHK('rKyogiAll', '構成：全体会'), CHK('rKyogiBukai', '構成：部会'), CHK('rKyogiKobetsu', '構成：個別支援会議'),
+      A('rBukai', '部会の状況', { wide: true, rows: 2 }), A('rTheme', '最近の検討テーマ', { wide: true }),
+      A('rIssue', 'その他の共有されている地域課題', { wide: true }), A('rIssueChild', '地域課題：児童', { rows: 2 }), A('rIssueWork', '地域課題：就労', { rows: 2 }),
+      A('rIssueQty', '地域課題：サービスの量', { rows: 2 }), A('rIssueQual', '地域課題：サービスの質', { rows: 2 }),
+      SEL('rRel', '自身の関与度', ['', 'よく知っている', '会ったことがある', '電話をしたことがある', '名前しか知らない', '全く知らない'])
+    ] },
+    { t: '4〜6 行政・事業・事業所（⑨）', f: [
+      A('rGyosei', '地域の障害福祉行政の特徴', { wide: true, rows: 4 }), T('rGyoseiSrc', '→情報入手先'),
+      T('rChiikiYear', '市町村地域生活支援事業（平成　年度）'), T('rChiikiSrc', '→情報入手先'),
+      A('rChiiki', '市町村地域生活支援事業の実施状況や特徴・課題', { wide: true, rows: 4 }),
+      T('rJigyoSrc', '事業所の状況 →情報入手先'),
+      A('rKyotaku', '居宅・居住系サービス', { wide: true, rows: 4 }), A('rTsusho', '通所系サービス', { wide: true, rows: 4 }), A('rNyusho', '入所系サービス（短期入所を含む）', { wide: true, rows: 4 })
+    ] }
+  ],
+  teishutsu: [
+    { t: '課題の送付票', w: 'send', lead: '受講者・所属機関は「基本情報」タブの内容が入ります。' },
+    { t: '協力依頼・同意書', lead: '事例提供協力者・代諾者の名前は本人が自署する欄なので、アプリでは印字しません。', f: [
+      YMD('cExplain', '説明日（令和）'), T('cOffice', '事業所名', { hint: '空欄なら相談支援事業者名' }), T('cExplainer', '説明者（職・氏名）', { hint: '自署欄。「自署欄にも印字」をオンにしたときだけ入ります' }),
+      YMD('cConsent', '同意日（令和）')
+    ] },
+    { t: '実習報告書', lead: '「実習機関のご担当者ご記載欄」は実習先に書いてもらうので印字しません。', f: [
+      T('jFacility', '実習をした機関'), YMD('jVisit', '実習をした日（令和）'), T('jStart', '開始時刻', { ph: '10:00' }), T('jEnd', '終了時刻', { ph: '15:00' }),
+      YMD('jReport', '報告日（令和）')
+    ] }
+  ]
+};
+
+// ============ 描画 ============
+function toChips(keys) {
+  const set = []; keys.forEach(k => (RM[k] || []).forEach(n => { if (!set.includes(n)) set.push(n); }));
+  return set.length ? `<span class="to" title="反映先の様式">${set.map(n => `<i>${esc(n)}</i>`).join('')}</span>` : '';
+}
+function fieldHTML(f) {
+  const d = D(), id = 'in-' + f.k;
+  const lab = `<label for="${id}">${esc(f.l)} ${toChips([f.k])}</label>`;
+  const hint = f.hint ? `<span class="hint">${esc(f.hint)}</span>` : '';
+  const v = d[f.k] == null ? '' : d[f.k];
+  let inp = '';
+  if (f.t === 'text') {
+    const dl = f.opts ? ` list="dl-${f.k}"` : '';
+    inp = `<input type="text" id="${id}" data-k="${f.k}" value="${esc(v)}"${f.ph ? ` placeholder="${esc(f.ph)}"` : ''}${dl} autocomplete="off">` + (f.opts ? `<datalist id="dl-${f.k}">${f.opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist>` : '');
+  } else if (f.t === 'area') {
+    inp = `<textarea id="${id}" data-k="${f.k}" rows="${f.rows || 3}"${f.ph ? ` placeholder="${esc(f.ph)}"` : ''}>${esc(v)}</textarea>`;
+    inp += `<div class="count" data-count="${f.k}"${f.max ? ` data-max="${f.max}"` : ''}></div>`;
+  } else if (f.t === 'sel') {
+    inp = `<select id="${id}" data-k="${f.k}">${f.opts.map(o => `<option value="${esc(o)}"${String(v) === o ? ' selected' : ''}>${o ? esc(o) : '（選ぶ）'}</option>`).join('')}</select>`;
+  } else if (f.t === 'ymd') {
+    const p = s => esc(d[f.k + s] || '');
+    return `<div class="f"><span class="lab">${esc(f.l)} ${toChips([f.k + 'Y'])}</span><div class="ymd">令和<input type="text" inputmode="numeric" id="${id}Y" data-k="${f.k}Y" value="${p('Y')}" aria-label="${esc(f.l)} 年">年<input type="text" inputmode="numeric" id="${id}M" data-k="${f.k}M" value="${p('M')}" aria-label="${esc(f.l)} 月">月<input type="text" inputmode="numeric" id="${id}D" data-k="${f.k}D" value="${p('D')}" aria-label="${esc(f.l)} 日">日</div></div>`;
+  } else if (f.t === 'chk') {
+    return `<div class="f${f.wide ? ' wide' : ''}"><label class="chk"><input type="checkbox" id="${id}" data-k="${f.k}"${v ? ' checked' : ''}><span>${esc(f.l)} ${toChips([f.k])}</span></label>${hint}</div>`;
+  }
+  return `<div class="f${f.wide ? ' wide' : ''}">${lab}${inp}${hint}</div>`;
+}
+function sectionHTML(sec) {
+  const body = sec.w ? widgetHTML(sec.w) : `<div class="fields">${sec.f.map(fieldHTML).join('')}</div>`;
+  return `<section class="card"><header><h2>${esc(sec.t)}</h2></header>${sec.lead ? `<p class="lead">${esc(sec.lead)}</p>` : ''}${body}</section>`;
+}
+function ta(k, label, rows = 2) {
+  const v = getPath(D(), k);
+  return `<div class="f"><label class="mini" for="in-${k}">${esc(label)}</label><textarea id="in-${k}" data-k="${k}" rows="${rows}">${esc(v == null ? '' : v)}</textarea></div>`;
+}
+function widgetHTML(w) {
+  const d = D();
+  if (w === 'asmt') {
+    const groups = KS.ASMT.map(g => `<details class="dom"${g.s === 1 ? ' open' : ''}><summary>${esc(g.title)} <span class="to"><i>③</i></span></summary><div class="body">${g.rows.map((r, ri) =>
+      `<div class="sub-card"><div class="t">${esc(r)}</div><div class="cols5">${KS.ASMT_COLS.map((c, ci) => ta(`a${g.s}_${ri + 1}_${ci + 1}`, c)).join('')}</div></div>`).join('')}</div></details>`).join('');
+    const fam = `<details class="dom"><summary>6 家族支援に関する領域（項目は自由に） <span class="to"><i>③</i></span></summary><div class="body">${[1, 2].map(n =>
+      `<div class="sub-card"><div class="f"><label class="mini" for="in-fam${n}_item">${n}行目の項目</label><input type="text" id="in-fam${n}_item" data-k="fam${n}_item" value="${esc(d['fam' + n + '_item'] || '')}"></div><div class="cols5">${KS.ASMT_COLS.map((c, ci) => ta(`fam${n}_${ci + 1}`, c)).join('')}</div></div>`).join('')}</div></details>`;
+    return `<p class="lead">列：${KS.ASMT_COLS.join('／')}。書いた所だけ様式に入ります。</p>${groups}${fam}`;
+  }
+  if (w === 'pri') {
+    return KS.PRI_COLS && d.pri.map((p, r) => `<details class="dom"${r < 3 ? ' open' : ''}><summary>優先順位 ${r + 1}${p.need ? '：' + esc(String(p.need).slice(0, 24)) : ''}</summary><div class="body"><div class="cols7">${KS.PRI_COLS.map(([k, l]) => ta(`pri.${r}.${k}`, l, k === 'when' || k === 'evalWhen' ? 1 : 3)).join('')}</div></div></details>`).join('');
+  }
+  if (w === 'support') {
+    return [['supPub', '公的支援（障害福祉サービス、介護保険等）'], ['supOth', 'その他の支援']].map(([k, l]) =>
+      `<div class="sub-card"><div class="t">${esc(l)} <span class="to"><i>⑦</i></span></div><div class="cols5">${KS.SUP_COLS.map(([c, cl]) => ta(`${k}.${c}`, cl)).join('')}</div></div>`).join('');
+  }
+  if (w === 'wkPlan' || w === 'wkNow') return weekHTML(w);
+  if (w === 'send') {
+    return `<div class="list">${KS.SEND_ITEMS.map((l, i) => `<label class="chk"><input type="checkbox" id="in-send-${i}" data-k="send.${i}"${d.send[i] ? ' checked' : ''}><span>${esc(l)}</span></label>`).join('')}</div>`;
+  }
+  return '';
+}
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+function weekHTML(key) {
+  const d = D(), bl = d[key];
+  const rows = bl.map((b, i) => `<div class="blk" data-blk="${key}.${i}">
+    <div class="days" role="group" aria-label="曜日">${KS.DAYS.map((dn, dy) => `<button type="button" data-day="${key}.${i}.${dy}" aria-pressed="${(b.days || []).includes(dy)}">${dn}</button>`).join('')}</div>
+    <div class="hours"><select data-k="${key}.${i}.s" data-num aria-label="開始">${HOURS.map(h => `<option value="${h}"${Number(b.s) === h ? ' selected' : ''}>${h}時</option>`).join('')}</select>〜<select data-k="${key}.${i}.e" data-num aria-label="終了">${HOURS.map(h => `<option value="${h}"${Number(b.e) === h ? ' selected' : ''}>${h}時</option>`).join('')}</select></div>
+    <input type="text" data-k="${key}.${i}.t" value="${esc(b.t || '')}" placeholder="活動・サービス（例：就労継続支援B型）" aria-label="内容">
+    <button type="button" class="btn small" data-delblk="${key}.${i}" aria-label="この行を消す">×</button></div>`).join('');
+  const copy = key === 'wkNow' ? `<button type="button" class="btn small" data-copywk="1">⑥の週間計画をコピーして始める</button>` : '';
+  return `<p class="lead">曜日を選び、始まりと終わりの時刻と内容を書きます。最初の時間に内容、続く時間に「↓」が入ります。日をまたぐ（22時〜7時など）こともできます。 ${toChips([key])}</p>
+    <div>${rows || '<p class="note">まだ予定がありません。「予定を追加」から始めてください。</p>'}</div>
+    <div class="row"><button type="button" class="btn small primary" data-addblk="${key}">＋ 予定を追加</button>${copy}</div>
+    <div class="wk-scroll" id="wkprev-${key}">${weekTable(bl)}</div>`;
+}
+function weekTable(bl) {
+  const c = KS.weekCells(bl), order = Array.from({ length: 24 }, (_, i) => (i + 4) % 24);
+  return `<table class="wk"><thead><tr><th></th>${KS.DAYS.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${order.map(h => `<tr><td class="h">${h}:00</td>${c.map(col => {
+    const v = col[h]; return `<td class="${v ? (v === '↓' ? 'on cont' : 'on') : ''}">${esc(v)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function renderTabs() {
+  $('tabs').innerHTML = TABS.map(t => `<button type="button" role="tab" id="tab-${t.id}" aria-selected="${S.tab === t.id}" data-tab="${t.id}">${t.label}</button>`).join('');
+  const on = $('tab-' + S.tab); if (on) { const nav = $('tabs'); nav.scrollLeft = Math.max(0, on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2); }
+}
+function renderMain() {
+  const tab = S.tab || 'ichiran', c = cur();
+  let html = '';
+  if (c.sample) html += `<div class="banner"><p>サンプル事例（架空の人物）を表示しています。どの欄がどの様式に入るか確かめてから、自分のケースを作ってください。</p><button class="btn small primary" type="button" data-act="startBlank">空のケースで始める</button><button class="btn small" type="button" data-act="keepSample">このまま書き換える</button></div>`;
+  if (tab === 'ichiran') html += ichiranHTML();
+  else if (tab === 'data') html += dataHTML();
+  else html += (SECTIONS[tab] || []).map(sectionHTML).join('');
+  $('main').innerHTML = html;
+  updateCounts();
+}
+function renderAll() {
+  $('caseName').textContent = caseLabel(cur());
+  renderTabs(); renderMain();
+}
+function updateCounts() {
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const v = String(getPath(D(), el.dataset.count) || ''), n = Array.from(v.replace(/\n/g, '')).length, mx = Number(el.dataset.max || 0);
+    el.textContent = n ? (mx ? `${n} / ${mx}字` : `${n}字`) : '';
+    el.classList.toggle('over', !!mx && n > mx * 1.15);
+  });
+}
+
+// ---- 様式の一覧 ----
+const openList = new Set();
+function ichiranHTML() {
+  const d = D(), groups = [];
+  KS.FORMS.forEach(f => { let g = groups.find(x => x.name === f.group); if (!g) groups.push(g = { name: f.group, items: [] }); g.items.push(f); });
+  const all = KS.FORMS.map(f => KS.progress(f, d)), fill = all.reduce((a, p) => a + p.fill, 0), tot = all.reduce((a, p) => a + p.tot, 0);
+  return `<section class="card"><header><h2>様式の一覧</h2><span class="note num">全体で ${fill} / ${tot} 欄に入力済み</span></header>
+    <p class="lead">各タブで入力した内容が、下の様式（Googleドライブ「計画相談 › 入力ホーム付様式」のPDF）に自動で入ります。「欄を見る」で様式ごとの中身を確かめ、その様式だけ書き換えることもできます。</p>
+    <div class="row"><button class="btn primary" type="button" data-act="mergeAll">📎 全部を1つのPDFにまとめる</button><button class="btn" type="button" data-act="driveAll">☁ 全部をドライブに保存</button></div>
+    ${groups.map(g => `<div class="forms-group"><h3>${esc(g.name)}</h3>${g.items.map(f => formRowHTML(f, d)).join('')}</div>`).join('')}
+  </section>`;
+}
+function formRowHTML(f, d) {
+  const p = KS.progress(f, d), pct = p.tot ? Math.round(p.fill / p.tot * 100) : 0;
+  const grid = p.gridTot ? `・週間表 ${p.gridFill}/${p.gridTot}マス` : '';
+  const open = openList.has(f.id);
+  return `<div class="form-row" id="row-${f.id}"><div class="no">${esc(f.no)}</div>
+    <div><div class="name">${esc(f.name)}</div><div class="sub">${p.fill} / ${p.tot} 欄${grid}${tplCache[f.id] ? '・PDF読み込み済み' : ''}</div><div class="meter" aria-hidden="true"><b style="width:${pct}%"></b></div></div>
+    <div class="acts"><button class="btn small" type="button" data-fields="${f.id}" aria-expanded="${open}">${open ? '閉じる' : '欄を見る'}</button><button class="btn small plan" type="button" data-make="${f.id}">PDFを作る</button></div>
+    ${open ? fieldListHTML(f, d) : ''}</div>`;
+}
+function fieldListHTML(f, d) {
+  const ov = (d.ov && d.ov[f.id]) || {};
+  const items = f.entries.filter(e => !(e[3] && e[3].t === 'grid') && !f.skip.includes(e[0])).map(e => {
+    const t = e[3] && e[3].t, auto = KS.entryValue(f, e, { ...d, ov: {} }), o = ov[e[0]];
+    if (t === 'cb') return `<div class="fl"><div class="k">${esc(e[1])}</div><div class="auto">${auto ? '☑ チェックが入ります' : '□ チェックなし'}</div></div>`;
+    return `<div class="fl"><div class="k">${esc(e[1])}<small>${o ? 'この様式だけ書き換え中' : '自動で入る内容'}</small></div>
+      <div><textarea rows="1" class="${o ? 'ov' : ''}" data-ov="${f.id}|${e[0]}" placeholder="${esc(auto || '（空欄）')}" aria-label="${esc(e[1])}">${esc(o || '')}</textarea>${o ? `<button type="button" class="btn ghost small" data-ovclear="${f.id}|${esc(e[0])}">自動に戻す</button>` : ''}</div></div>`;
+  }).join('');
+  const gridNote = f.entries.some(e => e[3] && e[3].t === 'grid') ? `<p class="note">週間表のマスは「週間・生活」タブの予定から作られます。</p>` : '';
+  const skip = f.skip.length ? `<p class="note">署名欄・実習先の記入欄は空欄のままにします。</p>` : '';
+  return `<div class="fieldlist"><p class="note">薄い字が自動で入る内容です。書き換えたいときだけ入力すると、この様式だけ変わります。</p>${items}${gridNote}${skip}</div>`;
+}
+
+// ---- データ ----
+function dataHTML() {
+  return `<section class="card"><header><h2>ケース</h2></header>
+    <div class="list">${S.cases.map(c => `<button type="button" class="item" data-switch="${c.id}" aria-current="${c.id === S.cur}"><span>${esc(caseLabel(c))}${c.sample ? '（サンプル）' : ''}</span><small class="num">${esc((c.at || '').slice(0, 10))}</small></button>`).join('')}</div>
+    <div class="row"><button class="btn primary" type="button" data-act="newCase">＋ 新しいケース</button><button class="btn" type="button" data-act="dupCase">このケースを複製</button><button class="btn" type="button" data-act="addSample">サンプルを追加</button><button class="btn" type="button" data-act="delCase">このケースを削除</button></div>
+    <p class="note">新しいケースには受講者・計画の情報（受講番号、所属、相談支援事業者など）を引き継ぎます。</p></section>
+  <section class="card"><header><h2>保存と書き出し</h2></header>
+    <p class="lead">入力はこの端末に自動保存されます。claude.ai で開いているときは、ほかの端末からも同じ内容を開けます。</p>
+    <div class="row"><button class="btn" type="button" data-act="exportJson">⬇ このケースをファイルに書き出す</button><button class="btn" type="button" data-act="importJson">⬆ ファイルから読み込む</button><button class="btn" type="button" data-act="driveJson">☁ ドライブにも控えを保存</button></div></section>`;
+}
+
+// ============ 入力イベント ============
+$('main').addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.ov) { setOverride(el.dataset.ov, el.value); return; }
+  const k = el.dataset.k; if (!k) return;
+  let v = el.type === 'checkbox' ? el.checked : el.value;
+  if (el.dataset.num != null) v = Number(v);
+  setPath(D(), k, v);
+  touch();
+  if (k.startsWith('wkPlan') || k.startsWith('wkNow')) { const key = k.split('.')[0]; const box = $('wkprev-' + key); if (box) box.innerHTML = weekTable(D()[key]); }
+  if (k === 'initial' || k === 'caseTitle') $('caseName').textContent = caseLabel(cur());
+  updateCounts();
+});
+function setOverride(key, value) {
+  const [fid, name] = key.split('|'), d = D();
+  d.ov[fid] = d.ov[fid] || {};
+  if (value) d.ov[fid][name] = value; else delete d.ov[fid][name];
+  touch();
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  S.tab = b.dataset.tab; store.set(LS, JSON.stringify(S)); renderTabs(); renderMain(); window.scrollTo({ top: 0 });
+});
+$('caseChip').addEventListener('click', () => { S.tab = 'data'; renderTabs(); renderMain(); });
+$('main').addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t) return;
+  const d = D();
+  if (t.dataset.day) { const [key, i, dy] = t.dataset.day.split('.'); const b = d[key][i]; b.days = b.days || []; const n = Number(dy); b.days = b.days.includes(n) ? b.days.filter(x => x !== n) : [...b.days, n].sort(); t.setAttribute('aria-pressed', b.days.includes(n)); touch(); $('wkprev-' + key).innerHTML = weekTable(d[key]); return; }
+  if (t.dataset.addblk) { const key = t.dataset.addblk; d[key].push({ days: [0, 1, 2, 3, 4], s: 9, e: 10, t: '' }); touch(); renderMain(); return; }
+  if (t.dataset.delblk) { const [key, i] = t.dataset.delblk.split('.'); d[key].splice(Number(i), 1); touch(); renderMain(); return; }
+  if (t.dataset.copywk) { if (d.wkNow.length && !(await askConfirm('いま入っている「現在の生活」の予定を、⑥の週間計画で置き換えますか？', '置き換える'))) return; d.wkNow = clone(d.wkPlan); touch(); renderMain(); return; }
+  if (t.dataset.fields) { const id = t.dataset.fields; openList.has(id) ? openList.delete(id) : openList.add(id); const row = $('row-' + id); row.outerHTML = formRowHTML(KS.FORMS.find(f => f.id === id), d); return; }
+  if (t.dataset.ovclear) { setOverride(t.dataset.ovclear, ''); const id = t.dataset.ovclear.split('|')[0]; $('row-' + id).outerHTML = formRowHTML(KS.FORMS.find(f => f.id === id), d); return; }
+  if (t.dataset.make) { makeOne(KS.FORMS.find(f => f.id === t.dataset.make), t); return; }
+  if (t.dataset.switch) { S.cur = t.dataset.switch; store.set(LS, JSON.stringify(S)); renderAll(); toast('ケースを切り替えました'); return; }
+  const act = t.dataset.act; if (!act) return;
+  if (act === 'startBlank') { const c = newCase(normalize(carryOver(d)), false); S.cases.push(c); S.cur = c.id; S.tab = 'kihon'; dirty.add(c.id); saveNow(); renderAll(); toast('空のケースを作りました'); }
+  else if (act === 'keepSample') { cur().sample = false; touch(); renderMain(); }
+  else if (act === 'newCase') { const c = newCase(normalize(carryOver(d))); S.cases.push(c); S.cur = c.id; S.tab = 'kihon'; dirty.add(c.id); saveNow(); renderAll(); toast('新しいケースを作りました'); }
+  else if (act === 'dupCase') { const c = newCase(normalize(clone(d))); c.data.caseTitle = (c.data.caseTitle || '') + '（コピー）'; S.cases.push(c); S.cur = c.id; dirty.add(c.id); saveNow(); renderAll(); toast('複製しました'); }
+  else if (act === 'addSample') { const c = newCase(normalize(clone(window.KS_SAMPLE)), true); S.cases.push(c); S.cur = c.id; dirty.add(c.id); saveNow(); renderAll(); }
+  else if (act === 'delCase') {
+    if (!(await askConfirm(`「${caseLabel(cur())}」を削除しますか？\n元に戻せません。`, '削除する', true))) return;
+    const id = S.cur; S.cases = S.cases.filter(c => c.id !== id); dirty.add(id);
+    if (!S.cases.length) S.cases.push(newCase(normalize(clone(window.KS_SAMPLE)), true));
+    S.cur = S.cases[0].id; saveNow(); renderAll(); toast('削除しました');
+  }
+  else if (act === 'exportJson') { const name = `計画相談データ_${(d.initial || 'ケース').replace(/[\\/:*?"<>|]/g, '')}_${new Date().toISOString().slice(0, 10)}.json`; saveBlob(new Blob([JSON.stringify({ app: 'keikaku-soudan', v: 1, case: cur() }, null, 1)], { type: 'application/json' }), name); }
+  else if (act === 'importJson') $('jsonPick').click();
+  else if (act === 'driveJson') { const name = `計画相談データ_${(d.initial || 'ケース').replace(/[\\/:*?"<>|]/g, '')}_${new Date().toISOString().slice(0, 10)}.json`; openFolderPicker([{ name, blob: new Blob([JSON.stringify({ app: 'keikaku-soudan', v: 1, case: cur() }, null, 1)], { type: 'application/json' }) }]); }
+  else if (act === 'mergeAll') mergeAll(t);
+  else if (act === 'driveAll') driveAll(t);
+});
+function carryOver(d) {
+  const keep = ['tNo', 'tName', 'tOrg', 'mgrOrg', 'mgrName', 'printSelf', 'agency', 'planner', 'made', 'planStart', 'monitor', 'cOffice', 'jFacility'];
+  const n = {}; if (!cur().sample) keep.forEach(k => { if (d[k] != null) n[k] = d[k]; }); return n;
+}
+$('jsonPick').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); const c = j && j.case;
+    if (!c || !c.data) throw new Error('形式');
+    const n = newCase(normalize(c.data)); S.cases.push(n); S.cur = n.id; dirty.add(n.id); saveNow(); renderAll(); toast('読み込みました');
+  } catch (err) { toast('このファイルは読み込めませんでした（このアプリで書き出したファイルを選んでください）'); }
+});
+
+// ============ PDF ============
+let libP = null, fontBytes = null;
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('lib')); document.head.appendChild(s); }); }
+async function pdfLib() {
+  if (!libP) libP = (async () => {
+    if (!window.PDFLib) await loadScript('lib/pdf-lib.min.js');
+    if (!window.fontkit) await loadScript('lib/fontkit.umd.min.js');
+    if (!fontBytes) { const r = await fetch('fonts/jp.ttf'); if (!r.ok) throw new Error('font'); fontBytes = await r.arrayBuffer(); }
+    return { PDFLib: window.PDFLib, fontkit: window.fontkit, fontBytes };
+  })().catch(err => { libP = null; throw err; });
+  return libP;
+}
+let pdfjsP = null;
+function pdfjs() {
+  if (!pdfjsP) pdfjsP = (async () => {
+    if (!window.pdfjsLib) await loadScript('lib/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('lib/pdf.worker.min.js', location.href).href;
+    return window.pdfjsLib;
+  })().catch(err => { pdfjsP = null; throw err; });
+  return pdfjsP;
+}
+const tplCache = {};
+let mcpP = null;
+function mcp() { if (!mcpP) mcpP = (window.claude && window.claude.use ? window.claude.use('mcp') : Promise.resolve(null)).catch(() => null); return mcpP; }
+function b64FromPayload(p) {
+  let best = '';
+  const walk = o => { if (typeof o === 'string') { const t = o.replace(/\s/g, ''); if (t.length > best.length && /^[A-Za-z0-9+/=_-]+$/.test(t.slice(0, 200))) best = t; } else if (o && typeof o === 'object') Object.values(o).forEach(walk); };
+  walk(p); return best.replace(/-/g, '+').replace(/_/g, '/');
+}
+function b64ToU8(b64) { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; }
+function u8ToB64(u8) { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(bin); }
+function driveErr(e) {
+  const c = e && (e.code || (e.error && e.error.code));
+  if (c === 'needs_reauth') return 'Googleドライブの接続が切れています。claude.ai の「設定 → コネクタ」でつなぎ直してください。';
+  if (c === 'server_not_connected') return 'Googleドライブがつながっていません。claude.ai の「設定 → コネクタ」で Google Drive を追加してください。';
+  if (c === 'not_granted' || c === 'declined') return 'Googleドライブの利用が許可されませんでした。';
+  return 'Googleドライブから読み込めませんでした。';
+}
+async function getTemplate(f) {
+  if (tplCache[f.id]) return tplCache[f.id];
+  const m = await mcp();
+  if (!m) throw { code: 'no_mcp' };
+  const res = await m.callTool('Google Drive', 'download_file_content', { fileId: f.drive });
+  const b64 = b64FromPayload(res && (res.payload ?? res)) || b64FromPayload(res && res.content);
+  if (!b64) throw { code: 'empty' };
+  const u8 = b64ToU8(b64);
+  if (String.fromCharCode(...u8.subarray(0, 4)) !== '%PDF') throw { code: 'empty' };
+  tplCache[f.id] = u8; return u8;
+}
+function pickTemplate(f) {
+  return new Promise(resolve => {
+    const inp = $('filePick');
+    inp.onchange = async () => { const file = inp.files[0]; inp.value = ''; if (!file) return resolve(null); const u8 = new Uint8Array(await file.arrayBuffer()); tplCache[f.id] = u8; resolve(u8); };
+    inp.click();
+  });
+}
+async function build(f, opt) {
+  const lib = await pdfLib();
+  const tpl = await getTemplate(f);
+  return KS.fillForm(f, tpl, D(), lib, opt);
+}
+function fileName(f) { const d = D(); return `${f.no}_${f.name.replace(/[（）\s]/g, '').replace(/[\\/:*?"<>|]/g, '')}_${(d.initial || '').replace(/[\\/:*?"<>|.]/g, '')}.pdf`.replace(/_\.pdf$/, '.pdf'); }
+
+async function makeOne(f, btn) {
+  const label = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '作成中…'; }
+  try {
+    const r = await build(f);
+    showPreview(f, r);
+  } catch (err) {
+    if (err && (err.code === 'no_mcp' || err.code === 'empty' || err.code === 'tool_error' || err.code === 'needs_reauth' || err.code === 'server_not_connected' || err.code === 'not_granted')) askUpload(f, err);
+    else showModal('PDFを作れませんでした', `<p class="note bad">PDFを作る部品を読み込めませんでした。通信を確かめて、もう一度押してください。</p>`, '');
+  } finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+}
+function askUpload(f, err) {
+  const why = err && err.code === 'no_mcp' ? 'この画面ではGoogleドライブを使えません（claude.ai で公開ページとして開くと使えます）。' : driveErr(err);
+  showModal(`${f.no} ${f.name}`, `<p class="note warn">${esc(why)}</p><p class="note">手元にある「${esc(f.file)}_入力フォーム付き.pdf」を選ぶと、そのPDFに書き込みます。</p>`,
+    `<button class="btn primary" type="button" id="upBtn">PDFファイルを選ぶ</button>`);
+  $('upBtn').onclick = async () => { const u8 = await pickTemplate(f); if (!u8) return; hideModal(); makeOne(f); };
+}
+let preview = null;
+async function showPreview(f, r) {
+  const blob = new Blob([r.bytes], { type: 'application/pdf' }), name = fileName(f);
+  preview = { blob, name };
+  const warn = (r.small.length ? `<p class="note warn">文字が多いため小さくなった欄：${esc([...new Set(r.small)].slice(0, 8).join('、'))}${r.small.length > 8 ? ' ほか' : ''}</p>` : '') + (r.miss.length ? `<p class="note bad">入らなかった欄：${esc(r.miss.join('、'))}</p>` : '');
+  showModal(`${f.no} ${f.name}`, `<p class="note">${r.ok}か所に書き込みました。ファイル名：${esc(name)}</p>${warn}<div class="pages" id="pages"><p class="note">プレビューを表示しています…</p></div>`,
+    `<button class="btn" type="button" id="pvDl">⬇ ダウンロード</button><button class="btn primary" type="button" id="pvDrive">☁ ドライブに保存</button>`);
+  $('pvDl').onclick = () => saveBlob(blob, name);
+  $('pvDrive').onclick = () => openFolderPicker([{ blob, name }]);
+  renderPages(r.bytes, $('pages'));
+}
+async function renderPages(bytes, box) {
+  try {
+    const lib = await pdfjs();
+    const doc = await lib.getDocument({ data: bytes.slice(0) }).promise;
+    box.innerHTML = '';
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i), vp = page.getViewport({ scale: 1.6 });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height; cv.setAttribute('aria-label', `${i}ページ目`);
+      box.appendChild(cv);
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    }
+  } catch (err) { box.innerHTML = '<p class="note">この画面ではプレビューを表示できませんでした。ダウンロードして確かめてください。</p>'; }
+}
+async function buildAll(btn, label, flatten) {
+  const out = [], fails = [];
+  for (const [i, f] of KS.FORMS.entries()) {
+    btn.textContent = `${label}（${i + 1}/${KS.FORMS.length}）`;
+    try { out.push({ f, r: await build(f, { flatten }) }); } catch (err) { fails.push({ f, err }); }
+  }
+  return { out, fails };
+}
+async function mergeAll(btn) {
+  const label = btn.textContent; btn.disabled = true;
+  try {
+    const lib = await pdfLib();
+    const { out, fails } = await buildAll(btn, '作成中', true);
+    if (!out.length) { askUpload(KS.FORMS[0], fails[0] && fails[0].err); return; }
+    const merged = await lib.PDFLib.PDFDocument.create();
+    for (const { r } of out) { const src = await lib.PDFLib.PDFDocument.load(r.bytes); (await merged.copyPages(src, src.getPageIndices())).forEach(p => merged.addPage(p)); }
+    const bytes = await merged.save(), d = D();
+    const r = { bytes, ok: out.reduce((a, x) => a + x.r.ok, 0), small: out.flatMap(x => x.r.small), miss: fails.map(x => `${x.f.no}（PDFを読み込めませんでした）`) };
+    showPreview({ no: '一式', name: '提出様式（送付票〜⑨）', file: '' }, r);
+    preview.name = `計画相談_提出様式一式_${(d.initial || '').replace(/[\\/:*?"<>|.]/g, '')}.pdf`;
+  } catch (err) { showModal('まとめられませんでした', '<p class="note bad">PDFを作る部品を読み込めませんでした。通信を確かめて、もう一度押してください。</p>', ''); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+async function driveAll(btn) {
+  const label = btn.textContent; btn.disabled = true;
+  try {
+    const { out, fails } = await buildAll(btn, '作成中', false);
+    if (!out.length) { askUpload(KS.FORMS[0], fails[0] && fails[0].err); return; }
+    openFolderPicker(out.map(({ f, r }) => ({ blob: new Blob([r.bytes], { type: 'application/pdf' }), name: fileName(f) })), fails.length ? `${fails.map(x => x.f.no).join('・')} はPDFを読み込めなかったので含まれていません。` : '');
+  } catch (err) { showModal('作れませんでした', '<p class="note bad">PDFを作る部品を読み込めませんでした。通信を確かめて、もう一度押してください。</p>', ''); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
+// ============ ドライブに保存（フォルダを選ぶ） ============
+let fd = { stack: [], files: [] };
+function driveFiles(res) {
+  let out = null;
+  const walk = o => {
+    if (out) return;
+    if (typeof o === 'string') { const t = o.trim(); if (t[0] === '{' || t[0] === '[') { try { walk(JSON.parse(t)); } catch (e) { } } return; }
+    if (Array.isArray(o)) { if (o.length && o[0] && typeof o[0] === 'object' && 'id' in o[0] && ('title' in o[0] || 'name' in o[0])) { out = o; return; } o.forEach(walk); return; }
+    if (o && typeof o === 'object') { if (Array.isArray(o.files)) { out = o.files; return; } Object.values(o).forEach(walk); }
+  };
+  walk(res && (res.payload ?? res)); if (!out) walk(res && res.content);
+  return out || [];
+}
+function openFolderPicker(files, extra) {
+  fd.files = files;
+  const last = S.driveDir;
+  fd.stack = [{ id: 'root', name: 'マイドライブ' }, last && last.id ? last : KEIKAKU_FOLDER];
+  showModal('ドライブに保存', `<p class="note">${files.length === 1 ? esc(files[0].name) : `${files.length}個のファイル`}を保存するフォルダを選んでください。</p>${extra ? `<p class="note warn">${esc(extra)}</p>` : ''}
+    <div class="crumb" id="fdCrumb"></div><div class="list" id="fdList"></div><p class="note" id="fdMsg"></p>`,
+    `<button class="btn primary" type="button" id="fdHere">このフォルダに保存</button>`);
+  $('fdHere').onclick = saveHere;
+  fdLoad();
+}
+async function fdLoad() {
+  const c = fd.stack[fd.stack.length - 1];
+  $('fdCrumb').innerHTML = fd.stack.map((x, i) => `<button type="button" data-fdi="${i}">${esc(x.name)}</button>`).join('<span aria-hidden="true">›</span>');
+  $('fdList').innerHTML = '<p class="note">フォルダを読み込んでいます…</p>'; $('fdMsg').textContent = '';
+  try {
+    const m = await mcp(); if (!m) throw { code: 'no_mcp' };
+    const res = await m.callTool('Google Drive', 'search_files', { query: `parentId = '${c.id}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`, pageSize: 100, excludeContentSnippets: true });
+    const fs = driveFiles(res).map(f => ({ id: f.id, name: f.title || f.name })).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    $('fdList').innerHTML = fs.length ? fs.map(f => `<button type="button" class="item" data-fdgo="${esc(f.id)}" data-fdname="${esc(f.name)}"><span>📁 ${esc(f.name)}</span><small>開く ›</small></button>`).join('') : '<p class="note">この中にフォルダはありません。ここに保存できます。</p>';
+  } catch (err) {
+    $('fdList').innerHTML = '';
+    $('fdMsg').textContent = err && err.code === 'no_mcp' ? 'この画面ではGoogleドライブを使えません。「ダウンロード」で保存してください。' : driveErr(err);
+  }
+}
+$('mBody').addEventListener('click', e => {
+  const go = e.target.closest('[data-fdgo]'), cr = e.target.closest('[data-fdi]');
+  if (go) { fd.stack.push({ id: go.dataset.fdgo, name: go.dataset.fdname }); fdLoad(); }
+  else if (cr) { fd.stack = fd.stack.slice(0, Number(cr.dataset.fdi) + 1); fdLoad(); }
+});
+async function saveHere() {
+  const c = fd.stack[fd.stack.length - 1], btn = $('fdHere');
+  btn.disabled = true;
+  let done = 0; const failed = [];
+  try {
+    const m = await mcp(); if (!m) throw { code: 'no_mcp' };
+    for (const f of fd.files) {
+      btn.textContent = fd.files.length > 1 ? `保存中（${done + 1}/${fd.files.length}）` : '保存中…';
+      try {
+        const u8 = new Uint8Array(await f.blob.arrayBuffer());
+        const args = { title: f.name, base64Content: u8ToB64(u8), contentMimeType: f.blob.type || 'application/pdf', disableConversionToGoogleType: true };
+        if (c.id !== 'root') args.parentId = c.id;
+        const res = await m.callTool('Google Drive', 'create_file', args);
+        if (res && (res.isError || res.error)) throw res.error || { code: 'save' };
+        done++;
+      } catch (err) { failed.push(f.name); if (err && (err.code === 'needs_reauth' || err.code === 'server_not_connected' || err.code === 'not_granted')) throw err; }
+    }
+    S.driveDir = c.id === 'root' ? null : { id: c.id, name: c.name }; store.set(LS, JSON.stringify(S));
+    hideModal();
+    toast(failed.length ? `${done}個を保存しました（${failed.length}個は保存できませんでした）` : `ドライブの「${c.name}」に${done}個保存しました`);
+  } catch (err) {
+    $('fdMsg').textContent = err && err.code === 'no_mcp' ? 'この画面ではGoogleドライブを使えません。「ダウンロード」で保存してください。' : driveErr(err).replace('読み込めませんでした', '保存できませんでした');
+  } finally { if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = 'このフォルダに保存'; } }
+}
+
+// ============ 共通の部品 ============
+function showModal(title, body, foot) {
+  $('mTitle').textContent = title; $('mBody').innerHTML = body; $('mFoot').innerHTML = foot || '';
+  $('modal').hidden = false; $('mClose').focus();
+}
+function hideModal() { $('modal').hidden = true; $('mBody').innerHTML = ''; if (modalResolve) { modalResolve(false); modalResolve = null; } }
+$('mClose').addEventListener('click', hideModal);
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') hideModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) hideModal(); });
+let modalResolve = null;
+function askConfirm(text, yes, danger) {
+  return new Promise(res => {
+    showModal('確認', `<p style="white-space:pre-wrap;margin:0">${esc(text)}</p>`, `<button class="btn" type="button" id="cNo">やめる</button><button class="btn ${danger ? '' : 'primary'}" type="button" id="cYes" style="${danger ? 'color:var(--bad);border-color:var(--bad)' : ''}">${esc(yes)}</button>`);
+    modalResolve = res;
+    $('cNo').onclick = () => hideModal();
+    $('cYes').onclick = () => { modalResolve = null; hideModal(); res(true); };
+  });
+}
+let toastTimer = null;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.opacity = 0; }, 2800); }
+async function saveBlob(blob, name) {
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { await dl.save({ filename: name, data: blob }); toast(`保存しました：${name}`); return; }
+  } catch (e) { if (e && e.code === 'declined') { toast('ダウンロードをやめました'); return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+
+// ============ はじめに ============
+loadLocal();
+renderAll();
+(function hook(n) { if (window.claude && typeof window.claude.use === 'function') cloudInit(); else if (n < 40) setTimeout(() => hook(n + 1), 250); })(0);
+</script>
