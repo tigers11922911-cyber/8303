@@ -2,7 +2,7 @@
 
 📖 GitHubでアプリをネットに公開するしかた（小学生向けマニュアル）：スマホ版 `manual/github.html`／MacBook版 `manual/github-mac.html`
 
-まーとん8393 — 車中泊・温泉・酒場スポットマップ（`index.html` 単一ファイルのSPA）。
+まーとん酒場 — 車中泊・温泉・酒場スポットマップ（`index.html` 単一ファイルのSPA）。
 
 ## スプレッドシートへの直接書き込みを有効にする
 
