@@ -409,6 +409,13 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <label class="fld">読む速さ <span id="s-rate-val"></span>
         <input type="range" id="s-rate" min="0.7" max="1.6" step="0.05">
       </label>
+      <label class="fld">1回に読む文字数（1節の長さ）
+        <select id="s-chunk">
+          <option value="180">短め（約180字・読み始めが早い）</option>
+          <option value="320">標準（約320字）</option>
+          <option value="500">長め（約500字・おすすめ・無料枠で長く読める）</option>
+        </select>
+      </label>
       <label class="switch">朗読が終わったら次のカードへ進む<input type="checkbox" id="s-autonext"></label>
       <button class="btn primary" id="s-test" type="button">保存して試し聴き</button>
     </div>
@@ -540,6 +547,15 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
     </div>
   </div>
   <div class="tts-pause-box">
+    <div class="tts-pause-head"><span>1回に読む文字数</span><span class="tts-pause-val" id="tts-chunk-val">約500字</span></div>
+    <div class="tts-seg" id="tts-chunk-btns">
+      <button type="button" data-v="180">短め 180</button>
+      <button type="button" data-v="320">標準 320</button>
+      <button type="button" data-v="500">長め 500</button>
+    </div>
+    <div class="muted small" style="line-height:1.5">長めにすると Gemini に頼む回数が減り、無料枠で長い文章を読めます。短めは読み始めが早く、節を細かく選べます。</div>
+  </div>
+  <div class="tts-pause-box">
     <div class="tts-pause-head"><span>読む速さ</span><span class="tts-pause-val" id="tts-rate-val">1.0倍</span></div>
     <div class="tts-seg" id="tts-rate-btns">
       <button type="button" data-v="0.8">0.8</button>
@@ -616,7 +632,9 @@ function lsSet(k,v){
 }
 
 const TTS_MODELS=[
-  {id:"gemini-3.1-flash-tts-preview",name:"Gemini 3.1 Flash TTS（おすすめ）"},
+  {id:"gemini-3.8-flash-tts",name:"Gemini 3.8 Flash TTS（おすすめ）"},
+  {id:"gemini-3.8-flash-lite-tts",name:"Gemini 3.8 Flash Lite TTS（軽い・回数に余裕）"},
+  {id:"gemini-3.1-flash-tts-preview",name:"Gemini 3.1 Flash TTS"},
   {id:"gemini-2.5-flash-preview-tts",name:"Gemini 2.5 Flash TTS"},
   {id:"gemini-2.5-pro-preview-tts",name:"Gemini 2.5 Pro TTS（高品質・遅め）"}
 ];
@@ -633,7 +651,8 @@ const TTS_VOICES=[
   ["Achird","Achird（親しみやすい）"],["Zubenelgenubi","Zubenelgenubi（くだけた）"],
   ["Sadachbia","Sadachbia（生き生き）"],["Sadaltager","Sadaltager（物知り）"]
 ];
-const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",dict:[],u:0};
+const CHUNK_LENS=[180,320,500];  // 1回に読む文字数（多いほど Gemini に頼む回数が減り、無料枠で長く読める）
+const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",dict:[],chunkLen:500,u:0};
 const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:""};
 
 const state={
@@ -642,6 +661,11 @@ const state={
   opts:{...DEFAULT_OPTS,...lsGet(LS.local,{})}    // この端末だけの設定
 };
 if(!state.opts.ttsPos||typeof state.opts.ttsPos!=="object")state.opts.ttsPos={};
+// 以前のおすすめ（3.1）のままの人は、新しいおすすめに切りかえる（1回だけ）
+if(!state.prefs.mv){
+  if(state.prefs.model==="gemini-3.1-flash-tts-preview")state.prefs.model=TTS_MODELS[0].id;
+  state.prefs.mv=2;lsSet(LS.prefs,state.prefs);
+}
 
 /* ほかの単語帳アプリ（AI用語集 ai-yougo など）の形式を、このアプリの形に合わせる */
 function strHash(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return h.toString(36)}
@@ -1277,8 +1301,7 @@ const tts={
   pauseWaiters:[]
 };
 const TTS_IDLE_TEXT="Gemini 朗読（待機中）";
-const MAX_CHUNK=280;   // 1回の音声生成で読む最大文字数（長い段落はここで分ける）
-const MERGE_CHUNK=160; // 短い段落どうしは、合わせてこの文字数までなら1節にまとめる
+const TTS_TIMEOUT_MS=90000;  // Gemini の返事をまつ最長時間
 let lastSecSig="";
 
 function getTtsPrefs(){
@@ -1289,33 +1312,41 @@ function getTtsPrefs(){
     style:String(p.style||"").trim(),
     rate:Math.max(.5,Math.min(2,Number(p.rate)||1)),
     paraPause:Math.max(0,Math.min(5,Number(p.paraPause)||0)),
-    autoNext:p.autoNext!==false
+    autoNext:p.autoNext!==false,
+    chunkLen:CHUNK_LENS.includes(Number(p.chunkLen))?Number(p.chunkLen):500
   };
 }
 
-/* 文章を「節」に分ける。段落（改行）単位でまとめ、長い段落は文の切れ目で分割する */
-function speakChunks(text){
+/* 文章を「節」に分ける。
+   1節はおよそ「1回に読む文字数」（初期値500字）。段落・文の切れ目で区切り、長すぎる文は「、」で切る。
+   短い段落はまとめて1節にし、Gemini に頼む回数を減らす（無料枠で長く読めるように） */
+function speakChunks(text,target){
+  const T=Number(target)||getTtsPrefs().chunkLen;
+  const MAXU=Math.round(T*1.6);
   const paras=String(text||"").replace(/\r/g,"").split(/\n+/).map(s=>s.replace(/[ \t　]+/g," ").trim()).filter(Boolean);
   const pieces=[];
   for(const p of paras){
-    if(p.length<=MAX_CHUNK){pieces.push({text:p,paraEnd:true});continue}
-    const sents=p.match(/[^。！？!?]*[。！？!?]+[」』）)]*|[^。！？!?]+$/g)||[p];
-    let buf="";
-    const flush=()=>{if(buf){pieces.push({text:buf,paraEnd:false});buf=""}};
-    for(let s of sents){
-      while(s.length>MAX_CHUNK){flush();pieces.push({text:s.slice(0,MAX_CHUNK),paraEnd:false});s=s.slice(MAX_CHUNK)}
-      if(buf&&buf.length+s.length>MAX_CHUNK)flush();
-      buf+=s;
+    const units=[];
+    for(let s of (p.match(/[^。！？!?]*[。！？!?]+[」』）)]*|[^。！？!?]+$/g)||[p])){
+      while(s.length>MAXU){
+        let cut=s.lastIndexOf("、",T);
+        cut=cut<T*0.4?T:cut+1;
+        units.push(s.slice(0,cut));s=s.slice(cut);
+      }
+      if(s)units.push(s);
     }
-    flush();
-    if(pieces.length)pieces[pieces.length-1].paraEnd=true;
+    let buf="";
+    for(const u of units){
+      if(buf&&buf.length+u.length>T){pieces.push({text:buf,paraEnd:false});buf=""}
+      buf+=u;
+    }
+    if(buf)pieces.push({text:buf,paraEnd:true});
   }
-  // 短い段落は1節にまとめて、Geminiへのリクエスト回数を減らす
   const chunks=[];
   for(const pc of pieces){
     const last=chunks[chunks.length-1];
-    if(last&&last.pauseAfter&&pc.text.length+last.text.length+1<=MERGE_CHUNK){
-      last.text+="\n"+pc.text;last.pauseAfter=pc.paraEnd;
+    if(last&&last.text.length+1+pc.text.length<=T){
+      last.text+=(last.pauseAfter?"\n":"")+pc.text;last.pauseAfter=pc.paraEnd;
     }else{
       chunks.push({text:pc.text,pauseAfter:pc.paraEnd});
     }
@@ -1471,7 +1502,7 @@ const SILENT_URL=URL.createObjectURL(pcmToWavBlob(new Uint8Array(24000),24000));
 
 /* 生成した音声のキャッシュ（同じ文章を何度も生成しない＝無料枠の節約） */
 const memAudio=new Map();
-const AUDIO_DB="narreji-audio",AUDIO_STORE="a",AUDIO_MAX=160;
+const AUDIO_DB="narreji-audio",AUDIO_STORE="a",AUDIO_MAX=300;
 let audioDbP=null;
 function audioDb(){
   if(!audioDbP){
@@ -1537,19 +1568,27 @@ async function requestGeminiTts(model,text,voice,style,key,signal){
     }
   };
   for(let attempt=0;;attempt++){
-    let res;
+    let res,j=null;
+    // 90秒たっても返事がなければ打ち切って、もう一度たのむ
+    const rc=new AbortController();
+    const onAbort=()=>rc.abort();
+    if(signal)signal.addEventListener("abort",onAbort,{once:true});
+    const timer=setTimeout(()=>rc.abort(),TTS_TIMEOUT_MS);
     try{
       res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
-        method:"POST",signal,
+        method:"POST",signal:rc.signal,
         headers:{"Content-Type":"application/json","x-goog-api-key":key},
         body:JSON.stringify(body)
       });
+      try{j=await res.json()}catch(e){}
     }catch(e){
       if(signal&&signal.aborted)throw ttsErr("cancelled");
       if(attempt<1){await waitAbortable(1500,signal);continue}
       throw ttsErr("network","通信できませんでした（電波状況を確認してください）");
+    }finally{
+      clearTimeout(timer);
+      if(signal)signal.removeEventListener("abort",onAbort);
     }
-    let j=null;try{j=await res.json()}catch(e){}
     if(res.ok){
       const parts=j&&j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[];
       const part=parts.find(p=>p.inlineData&&p.inlineData.data);
@@ -1579,38 +1618,61 @@ async function requestGeminiTts(model,text,voice,style,key,signal){
         await waitAbortable(wait*1000,signal);
         continue;
       }
-      throw ttsErr("quota",perDay?"Gemini音声の1日の無料枠を使い切りました":"Gemini音声の利用回数の上限に達しました");
+      throw ttsErr("quota",perDay?"Gemini音声の1日の無料枠を使い切りました":"Gemini音声の利用回数の上限に達しました",{perDay});
     }
     if(res.status>=500&&attempt<2){await waitAbortable(1500*(attempt+1),signal);continue}
     throw ttsErr("api",`Gemini音声の作成に失敗しました（${res.status}）`);
   }
 }
+/* 無料枠はモデルごとに別々。上限になったモデルはしばらく使わず、次のモデルで読む */
+const modelQuotaUntil={};
+const modelUnavailable=new Set();
+const quotaNotified=new Set();
 async function fetchGeminiTtsUrl(text,voice,style,signal){
   const key=String(state.opts.apiKey||"").trim();
   if(!key)throw ttsErr("no_key","Gemini APIキーが未設定です");
   const pref=getTtsPrefs().model;
-  const models=[pref,...TTS_MODELS.map(m=>m.id).filter(m=>m!==pref)];
-  let lastErr=null;
-  for(const model of models){
-    const ck=[model,voice,style,text].join("\u0001");
+  const all=[pref,...TTS_MODELS.map(m=>m.id).filter(m=>m!==pref)];
+  const ckOf=model=>[model,voice,style,text].join("\u0001");
+  // どのモデルで作った声でも、保存してあればそれを使う（回数を使わない）
+  for(const model of all){
+    const ck=ckOf(model);
     if(memAudio.has(ck))return memAudio.get(ck);
+  }
+  for(const model of all){
+    const ck=ckOf(model);
     const cached=await idbGetAudio(ck);
     if(cached){const u=URL.createObjectURL(cached);memPut(ck,u);return u}
+  }
+  const t=now();
+  let order=all.filter(m=>!modelUnavailable.has(m)&&!(modelQuotaUntil[m]>t));
+  if(!order.length)order=all.filter(m=>!modelUnavailable.has(m));
+  let lastErr=null,quotaErr=null,prefMissing=modelUnavailable.has(state.prefs.model);
+  for(const model of order){
     try{
       const blob=await requestGeminiTts(model,text,voice,style,key,signal);
       if(model!==state.prefs.model){
-        state.prefs.model=model;savePrefs();
-        toast(`音声モデルを「${model}」に切り替えました`);
+        if(prefMissing&&!quotaErr){
+          // おすすめのモデルが使えなかった → 使えたモデルをこれからの標準にする
+          state.prefs.model=model;savePrefs();
+          toast(`音声モデルを「${model}」に切り替えました`);
+        }else if(quotaErr&&!quotaNotified.has(model)){
+          quotaNotified.add(model);
+          toast(`回数の上限のため、別のモデル（${model}）で読んでいます`);
+        }
       }
+      const ck=ckOf(model);
       idbPutAudio(ck,blob);
       const u=URL.createObjectURL(blob);memPut(ck,u);
       return u;
     }catch(e){
       lastErr=e;
-      if(e.code!=="model_unavailable")throw e;
+      if(e.code==="model_unavailable"){modelUnavailable.add(model);if(model===state.prefs.model)prefMissing=true;continue}
+      if(e.code==="quota"){modelQuotaUntil[model]=now()+(e.perDay?6*3600e3:60e3);quotaErr=e;continue}
+      throw e;
     }
   }
-  throw lastErr||ttsErr("api","Gemini音声を作成できませんでした");
+  throw quotaErr||lastErr||ttsErr("api","Gemini音声を作成できませんでした");
 }
 
 /* ---------- 再生 ---------- */
@@ -1916,7 +1978,7 @@ async function startGeminiSpeak(opts={}){
   $("tts-hint").textContent=`Gemini 音声（${prefs.voice}）・画面を閉じても継続`;
 
   try{
-    // 通信待ちを減らすため、1節先まで先読み（無料枠の回数制限に配慮して1つだけ）
+    // 通信待ちを減らすため、2節先まで先に声を作っておく
     const prefetches=new Map();
     const kick=idx=>{
       if(idx<chunks.length&&!prefetches.has(idx)){
@@ -1941,6 +2003,7 @@ async function startGeminiSpeak(opts={}){
       const url=res;
 
       kick(i+1);
+      kick(i+2);
 
       tts.loading=false;
       await waitWhilePaused(token);
@@ -2213,8 +2276,22 @@ $("tts-rec-all").onclick=()=>{
 $("tts-rec-cancel").onclick=()=>{if(rec.ctl)try{rec.ctl.abort()}catch(e){}};
 $("open-rec").onclick=()=>{openTtsBar(true);renderTtsSections();toast("「録音して保存」から、節ごとに音声を保存できます")};
 
+function setChunkLen(v){
+  v=Number(v);
+  if(!CHUNK_LENS.includes(v)||v===getTtsPrefs().chunkLen)return;
+  const playingCard=tts.active&&tts.cardId;
+  state.prefs.chunkLen=v;savePrefs();
+  lastSecSig="";
+  if(playingCard){stopSpeak();toast(`1回に読む文字数を約${v}字にしました。もう一度「朗読」をおしてください`)}
+  else toast(`1回に読む文字数を約${v}字にしました`);
+  applyTtsOptsUI();renderTtsSections();syncSpeakBtn();
+}
+document.querySelectorAll("#tts-chunk-btns button").forEach(btn=>btn.onclick=()=>setChunkLen(btn.dataset.v));
+$("s-chunk").onchange=()=>setChunkLen($("s-chunk").value);
 function applyTtsOptsUI(){
   const p=getTtsPrefs();
+  document.querySelectorAll("#tts-chunk-btns button").forEach(b=>b.classList.toggle("on",Number(b.dataset.v)===p.chunkLen));
+  $("tts-chunk-val").textContent=`約${p.chunkLen}字`;
   document.querySelectorAll("#tts-pause-btns button").forEach(b=>b.classList.toggle("on",Number(b.dataset.v)===p.paraPause));
   $("tts-pause-val").textContent=p.paraPause>0?`${p.paraPause}秒`:"なし";
   document.querySelectorAll("#tts-rate-btns button").forEach(b=>b.classList.toggle("on",Math.abs(Number(b.dataset.v)-p.rate)<.001));
@@ -2236,6 +2313,7 @@ function applySettingsUI(){
   $("s-rate").value=String(p.rate);
   $("s-rate-val").textContent=`（${p.rate.toFixed(2)}倍）`;
   $("s-autonext").checked=p.autoNext;
+  $("s-chunk").value=String(p.chunkLen);
   $("s-theme").value=state.prefs.theme||"auto";
   renderDict();
   $("s-sync-url").value=state.opts.syncUrl||"";
