@@ -171,8 +171,11 @@ nav.bottom button.on{color:var(--accent)}
 .tts-head-text{flex:1;min-width:0}
 .tts-title{font-weight:800;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tts-status{font-size:.8rem;color:var(--muted);font-weight:700;display:flex;align-items:center;gap:6px}
-.tts-ctrl{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px}
-.tts-ctrl .btn{padding:0 8px}
+.tts-ctrl{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:6px}
+.tts-ctrl .btn{padding:0 6px;gap:4px;font-size:.88rem;min-width:0;overflow:hidden}
+.tts-ctrl .btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tts-sub .ibtn{min-width:0}
+.tts-sub .ibtn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tts-sub{display:flex;gap:8px;justify-content:space-between}
 .tts-sub .ibtn{flex:1}
 .tts-more{display:flex;flex-direction:column;gap:8px}
@@ -230,6 +233,14 @@ fieldset.choice label{display:flex;gap:10px;align-items:flex-start;border:1px so
 fieldset.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
 #pdf-preview,#pdf-panel{scroll-margin-top:72px}
+.dict-add{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px;align-items:center}
+.dict-arrow{color:var(--muted);font-weight:800}
+.dict-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dict-list li{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px;background:var(--bg)}
+.dict-list .from{font-weight:800;word-break:break-all}
+.dict-list .to{word-break:break-all}
+.dict-empty{font-size:.82rem;color:var(--muted)}
+@media (max-width:380px){.dict-add{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.dict-arrow{display:none}.dict-add .btn{grid-column:1/-1}}
 .pdf-open{color:var(--accent);border-color:var(--accent)}
 .pdf-open-big{min-height:52px;font-size:1rem;background:var(--accent-soft)}
 #pdf-panel.flash{animation:flash 1.6s ease-out 1}
@@ -295,6 +306,7 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <button class="ibtn" id="study-mode" type="button" aria-pressed="false">学習モード（答えを隠す）</button>
       <button class="ibtn" id="only-new" type="button" aria-pressed="false">未習得だけ</button>
       <button class="ibtn" id="edit-cur" type="button">編集</button>
+      <button class="ibtn" id="open-rec" type="button"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>録音・保存</span></button>
       <button class="ibtn pdf-open" type="button" data-pdf-open><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><path d="M12 12v6M9.5 15.5 12 18l2.5-2.5"/></svg><span>PDFを読み込む</span></button>
     </div>
   </section>
@@ -400,6 +412,25 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <button class="btn primary" id="s-test" type="button">保存して試し聴き</button>
     </div>
 
+    <div class="panel" id="dict-panel">
+      <h2>読み方の変換（朗読用）</h2>
+      <p class="muted small" style="margin:0">朗読するときだけ、左の文字を右の読み方に置きかえます。画面の表示は変わりません。英語の略語や、読み方をまちがえやすい言葉に使います。</p>
+      <div class="dict-add">
+        <input type="text" id="d-from" placeholder="文字　例：AI" autocomplete="off" aria-label="置きかえる文字">
+        <span class="dict-arrow" aria-hidden="true">→</span>
+        <input type="text" id="d-to" placeholder="読み方　例：エーアイ" autocomplete="off" aria-label="読み方">
+        <button class="btn" id="d-add" type="button">追加</button>
+      </div>
+      <ul class="dict-list" id="d-list"></ul>
+      <label class="fld">ためしに読ませる
+        <div class="row">
+          <input type="text" id="d-test" placeholder="例：生成AIとLLMのちがい" autocomplete="off">
+          <button class="ibtn" id="d-test-btn" type="button">試し聴き</button>
+        </div>
+      </label>
+      <div class="muted small" id="d-test-out"></div>
+    </div>
+
     <div class="panel">
       <h2>同期（スマホ・パソコン間）</h2>
       <label class="fld">同期用 Apps Script のURL
@@ -484,6 +515,16 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <select id="tts-sec-select" aria-label="読み始める節を選ぶ"></select>
       <button class="ibtn ico-only" id="tts-sec-next" type="button" aria-label="次の節" title="次の節"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
+  </div>
+  <!-- 節ごとに録音して保存（Geminiの声をファイルにしてダウンロード） -->
+  <div class="tts-pause-box" id="tts-rec-box" hidden>
+    <div class="tts-pause-head"><span>録音して保存（Geminiの声）</span><span class="tts-pause-val" id="tts-rec-val"></span></div>
+    <div class="tts-sub">
+      <button class="ibtn" id="tts-rec-one" type="button"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>この節を保存</span></button>
+      <button class="ibtn" id="tts-rec-all" type="button"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg><span>全部を1つに保存</span></button>
+      <button class="ibtn" id="tts-rec-cancel" type="button" hidden>やめる</button>
+    </div>
+    <div class="muted small" id="tts-rec-status" aria-live="polite" style="line-height:1.5">音声ファイル（WAV）でダウンロードします。速さはふつう（1.0倍）で保存されます。</div>
   </div>
   <div class="tts-more" id="tts-more" hidden>
   <!-- 段落の合間（ポーズ時間）を決めるボタン -->
@@ -591,7 +632,7 @@ const TTS_VOICES=[
   ["Achird","Achird（親しみやすい）"],["Zubenelgenubi","Zubenelgenubi（くだけた）"],
   ["Sadachbia","Sadachbia（生き生き）"],["Sadaltager","Sadaltager（物知り）"]
 ];
-const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",u:0};
+const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",dict:[],u:0};
 const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:""};
 
 const state={
@@ -708,6 +749,8 @@ function tab(name){
   for(const t of ["study","list","add","settings"])$("tab-"+t).hidden=t!==name;
   document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
   state.opts.tab=name;saveOpts();
+  // ほかのタブへ移ったら朗読パネルは小さくたたむ（朗読中は下のミニバーで操作できる）
+  if(name!=="study"&&ttsBarOpen)openTtsBar(false);
   if(name==="list")renderList();
   if(name==="settings")applySettingsUI();
   window.scrollTo(0,0);
@@ -1328,7 +1371,7 @@ function chunkPreviewLabel(chunk,idx,total){
 function syncTtsIdleUI(idx,total){
   if(tts.active)return;
   const resume=idx>0&&total>1;
-  $("tts-play").innerHTML=ICO.play+(resume?`<span>続きから朗読（${idx+1}/${total}）</span>`:"<span>朗読をはじめる</span>");
+  $("tts-play").innerHTML=ICO.play+(resume?`<span>続きから ${idx+1}/${total}</span>`:"<span>朗読をはじめる</span>");
   const c=cur();
   $("tts-title").textContent=c?(c.f||"（見出しなし）"):"朗読";
   const text=resume?`第${idx+1}/${total}節で停止中（続きから再開できます）`:TTS_IDLE_TEXT;
@@ -1344,6 +1387,7 @@ function renderTtsSections(){
   const total=chunks.length;
   if(!c||!total){
     box.hidden=true;
+    $("tts-rec-box").hidden=true;
     lastSecSig="";
     syncTtsIdleUI(0,0);
     return;
@@ -1372,6 +1416,9 @@ function renderTtsSections(){
   prevB.disabled=idx<=0;
   nextB.disabled=idx>=total-1;
   resetB.disabled=idx<=0;
+  $("tts-rec-box").hidden=false;
+  $("tts-rec-val").textContent=`全${total}節`;
+  $("tts-rec-one").querySelector("span").textContent=total>1?`第${idx+1}節を保存`:"この節を保存";
   syncTtsIdleUI(idx,total);
 }
 function jumpTtsSection(idx,isReset){
@@ -1727,6 +1774,7 @@ function startFallbackSpeak(chunks,token,rate,noAutoNext,startIdx=0,cardId=null,
   try{ttsAudio.loop=false;ttsAudio.pause()}catch(e){}
   $("tts-hint").textContent="一時的に端末の音声で読み上げています";
   const speakOne=(text,onDone)=>{
+    text=applyReadingDict(text);
     // 長い文章は途中で切れる端末があるため、文単位で読み上げる
     const parts=text.match(/[^。！？!?\n]+[。！？!?]*|\n/g)?.map(s=>s.trim()).filter(Boolean)||[text];
     let k=0;
@@ -1868,7 +1916,7 @@ async function startGeminiSpeak(opts={}){
     const prefetches=new Map();
     const kick=idx=>{
       if(idx<chunks.length&&!prefetches.has(idx)){
-        prefetches.set(idx,fetchGeminiTtsUrl(chunks[idx].text,prefs.voice,prefs.style,ctl.signal).catch(err=>({__err:err})));
+        prefetches.set(idx,fetchGeminiTtsUrl(applyReadingDict(chunks[idx].text),prefs.voice,prefs.style,ctl.signal).catch(err=>({__err:err})));
       }
     };
     kick(startIdx);
@@ -1996,6 +2044,171 @@ document.querySelectorAll("#tts-rate-btns button").forEach(btn=>{
     if(tts.active&&!tts.fallback&&ttsAudio.src!==SILENT_URL){ttsAudio.playbackRate=state.prefs.rate}
   };
 });
+/* =========================================================
+   読み方の変換（朗読するときだけ置きかえる）
+   ========================================================= */
+let dictCache={key:"",re:null,map:null};
+function readingDict(){
+  const d=state.prefs.dict;
+  return Array.isArray(d)?d.filter(x=>x&&typeof x.a==="string"&&x.a.trim()):[];
+}
+function applyReadingDict(text){
+  const d=readingDict();
+  if(!d.length)return String(text||"");
+  const key=JSON.stringify(d);
+  if(dictCache.key!==key){
+    const map=new Map();d.forEach(x=>map.set(x.a,String(x.b||"")));
+    // 長い言葉から先にさがす（「生成AI」を「AI」より先に置きかえる）。置きかえた結果はもう一度置きかえない
+    const keys=[...map.keys()].sort((a,b)=>b.length-a.length).map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"));
+    dictCache={key,re:new RegExp(keys.join("|"),"g"),map};
+  }
+  return String(text||"").replace(dictCache.re,m=>dictCache.map.has(m)?dictCache.map.get(m):m);
+}
+function renderDict(){
+  const ul=$("d-list");ul.innerHTML="";
+  const d=readingDict();
+  if(!d.length){const li=document.createElement("li");li.className="dict-empty";li.style.cssText="display:block;border:0;background:none;padding:0";li.textContent="まだ登録がありません";ul.append(li);return}
+  d.forEach(x=>{
+    const li=document.createElement("li");
+    const a=document.createElement("span");a.className="from";a.textContent=x.a;
+    const ar=document.createElement("span");ar.className="dict-arrow";ar.textContent="→";
+    const b=document.createElement("span");b.className="to";b.textContent=x.b||"（読まない）";
+    const del=document.createElement("button");del.type="button";del.className="ibtn";del.textContent="削除";del.style.color="var(--danger)";
+    del.onclick=()=>{state.prefs.dict=readingDict().filter(y=>y.a!==x.a);savePrefs();renderDict();toast(`「${x.a}」の読み方を削除しました`)};
+    li.append(a,ar,b,del);ul.append(li);
+  });
+}
+$("d-add").onclick=()=>{
+  const a=$("d-from").value.trim(),b=$("d-to").value.trim();
+  if(!a){toast("置きかえる文字を入れてください");$("d-from").focus();return}
+  const list=readingDict().filter(y=>y.a!==a);
+  list.push({a,b});
+  state.prefs.dict=list;savePrefs();
+  $("d-from").value="";$("d-to").value="";$("d-from").focus();
+  renderDict();
+  toast(b?`「${a}」は「${b}」と読みます`:`「${a}」は読まないようにしました`);
+};
+$("d-to").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();$("d-add").onclick()}});
+$("d-test").addEventListener("input",()=>{const t=$("d-test").value.trim();$("d-test-out").textContent=t?`読み上げる文：${applyReadingDict(t)}`:""});
+$("d-test-btn").onclick=()=>{
+  const t=$("d-test").value.trim();
+  if(!t){toast("ためしに読ませる文を入れてください");return}
+  $("d-test-out").textContent=`読み上げる文：${applyReadingDict(t)}`;
+  openTtsBar(true);
+  startGeminiSpeak({customText:t,title:"読み方の試し聴き",label:"試し聴き中",noAutoNext:true,keepPanelState:true});
+};
+
+/* =========================================================
+   節ごとに録音して保存（Geminiの声を WAV ファイルにしてダウンロード）
+   ========================================================= */
+const rec={busy:false,ctl:null};
+function safeName(s){return String(s||"カード").replace(/[\\/:*?"<>|\r\n\t]/g,"_").replace(/\s+/g," ").trim().slice(0,40)||"カード"}
+function downloadBlob(blob,name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+}
+async function sectionAudioBlob(text,signal){
+  const p=getTtsPrefs();
+  const url=await fetchGeminiTtsUrl(applyReadingDict(text),p.voice,p.style,signal);
+  const r=await fetch(url);
+  return await r.blob();
+}
+/* WAV（16bit・モノラル）から音のデータだけを取り出す */
+function wavToPcm(buf){
+  const v=new DataView(buf);
+  const tag=o=>String.fromCharCode(v.getUint8(o),v.getUint8(o+1),v.getUint8(o+2),v.getUint8(o+3));
+  if(buf.byteLength<12||tag(0)!=="RIFF"||tag(8)!=="WAVE")return null;
+  let off=12,rate=24000,ch=1,bits=16;
+  while(off+8<=buf.byteLength){
+    const id=tag(off),size=v.getUint32(off+4,true);
+    if(id==="fmt "){ch=v.getUint16(off+10,true);rate=v.getUint32(off+12,true);bits=v.getUint16(off+22,true)}
+    else if(id==="data"){
+      if(ch!==1||bits!==16)return null;
+      return {pcm:new Uint8Array(buf,off+8,Math.min(size,buf.byteLength-off-8)),rate};
+    }
+    off+=8+size+(size&1);
+  }
+  return null;
+}
+function recTarget(){
+  const c=ttsTargetCard();const chunks=ttsChunksOf(c);
+  if(!c||!chunks.length)return null;
+  const idx=tts.active&&tts.cardId===c.id?tts.chunkIdx:(Number($("tts-sec-select").value)||0);
+  return {c,chunks,idx:Math.max(0,Math.min(chunks.length-1,idx))};
+}
+function setRecBusy(on,msg){
+  rec.busy=on;
+  $("tts-rec-one").disabled=on;$("tts-rec-all").disabled=on;$("tts-rec-cancel").hidden=!on;
+  if(msg!=null)$("tts-rec-status").textContent=msg;
+}
+function recReady(){
+  if(rec.busy)return false;
+  if(!String(state.opts.apiKey||"").trim()){
+    toast("録音して保存するには、設定でGemini APIキーを入れてください","設定へ",()=>tab("settings"));
+    return false;
+  }
+  return true;
+}
+function recErrorMsg(err){
+  if(err&&(err.code==="cancelled"||err.name==="AbortError"))return "やめました";
+  return (err&&err.message)||"保存できませんでした";
+}
+$("tts-rec-one").onclick=async()=>{
+  if(!recReady())return;
+  const t=recTarget();if(!t){toast("保存するカードがありません");return}
+  const ctl=new AbortController();rec.ctl=ctl;
+  setRecBusy(true,`第${t.idx+1}節を録音しています…`);
+  try{
+    const blob=await sectionAudioBlob(t.chunks[t.idx].text,ctl.signal);
+    const ext=/mpeg|mp3/.test(blob.type)?"mp3":"wav";
+    const name=`${safeName(t.c.f)}_第${t.idx+1}節.${ext}`;
+    downloadBlob(blob,name);
+    setRecBusy(false,`保存しました：${name}`);
+  }catch(err){setRecBusy(false,recErrorMsg(err))}
+  finally{if(rec.ctl===ctl)rec.ctl=null}
+};
+$("tts-rec-all").onclick=()=>{
+  if(!recReady())return;
+  const t=recTarget();if(!t){toast("保存するカードがありません");return}
+  const go=async()=>{
+    const ctl=new AbortController();rec.ctl=ctl;
+    const n=t.chunks.length,pause=getTtsPrefs().paraPause;
+    const parts=[];let rate=0,total=0;
+    setRecBusy(true,`録音しています…（0/${n}節）`);
+    try{
+      for(let i=0;i<n;i++){
+        setRecBusy(true,`録音しています…（${i+1}/${n}節）`);
+        const blob=await sectionAudioBlob(t.chunks[i].text,ctl.signal);
+        const w=wavToPcm(await blob.arrayBuffer());
+        if(!w)throw ttsErr("format","この声の形式は1つにまとめられません。「この節を保存」で1節ずつ保存してください");
+        if(rate&&w.rate!==rate)throw ttsErr("format","節ごとに音の形式がちがうため、1つにまとめられませんでした");
+        rate=w.rate;
+        parts.push(w.pcm);total+=w.pcm.length;
+        if(i<n-1){
+          // 節と節のあいだに少し間をあける（段落の切れ目は「段落の合間」の秒数）
+          const gap=Math.round(rate*(t.chunks[i].pauseAfter&&pause>0?pause:0.4))*2;
+          parts.push(new Uint8Array(gap));total+=gap;
+        }
+        if(total>300*1024*1024)throw ttsErr("too_big","長すぎて1つのファイルにできません。「この節を保存」で分けて保存してください");
+      }
+      const all=new Uint8Array(total);let o=0;
+      for(const p of parts){all.set(p,o);o+=p.length}
+      const name=`${safeName(t.c.f)}_全${n}節.wav`;
+      downloadBlob(pcmToWavBlob(all,rate),name);
+      const sec=Math.round(total/2/rate);
+      setRecBusy(false,`保存しました：${name}（${Math.floor(sec/60)}分${sec%60}秒・${(total/1024/1024).toFixed(1)}MB）`);
+    }catch(err){setRecBusy(false,recErrorMsg(err))}
+    finally{if(rec.ctl===ctl)rec.ctl=null}
+  };
+  if(t.chunks.length>20){
+    ask(`このカードは${t.chunks.length}節あります。\n全部を録音するのに時間がかかり、Geminiの無料枠も多く使います（一度録音した節は使い回します）。続けますか？`,"録音して保存",go);
+  }else go();
+};
+$("tts-rec-cancel").onclick=()=>{if(rec.ctl)try{rec.ctl.abort()}catch(e){}};
+$("open-rec").onclick=()=>{openTtsBar(true);renderTtsSections();toast("「録音して保存」から、節ごとに音声を保存できます")};
+
 function applyTtsOptsUI(){
   const p=getTtsPrefs();
   document.querySelectorAll("#tts-pause-btns button").forEach(b=>b.classList.toggle("on",Number(b.dataset.v)===p.paraPause));
@@ -2020,6 +2233,7 @@ function applySettingsUI(){
   $("s-rate-val").textContent=`（${p.rate.toFixed(2)}倍）`;
   $("s-autonext").checked=p.autoNext;
   $("s-theme").value=state.prefs.theme||"auto";
+  renderDict();
   $("s-sync-url").value=state.opts.syncUrl||"";
   $("s-sync-key").value=state.opts.syncKey||"";
   $("app-ver").textContent=`バージョン ${APP_VER}・カード ${liveCards().length}件`;
