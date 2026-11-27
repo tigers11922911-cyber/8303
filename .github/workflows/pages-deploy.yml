@@ -1,0 +1,34 @@
+# main に変更が入ったら、倉庫の中身をそのまま GitHub Pages に公開する。
+# 使うには、Settings → Pages → Build and deployment の Source を「GitHub Actions」にしておくこと。
+name: GitHub Pages に公開する
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: ファイルを取り出す
+        uses: actions/checkout@v5
+      - name: 公開するファイルをまとめる
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: GitHub Pages に公開する
+        id: deployment
+        uses: actions/deploy-pages@v4
