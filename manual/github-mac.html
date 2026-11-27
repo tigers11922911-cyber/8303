@@ -1,0 +1,579 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>MacでGitHub公開</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE  こども向け（小学生）・おうちの人といっしょに読む／MacBookで作業する人向け
+   IDEA   学校の「見学のしおり」：ファイルが、倉庫（GitHub）→ 窓（Pages）→ 画面へ旅をする。Macのキーは本物のキーの形で見せる
+   PICTURE 表紙にMacBookの絵（メニューバー・アドレスバー・Dock・Finderに丸数字）
+   COLOUR 緑 #2f6f5e の地、黄色のシール #ffd54a、赤の丸数字 #e8553a、GitHubのボタンは本物に近い緑と灰色
+   TYPE   Zen Maru Gothic 900 ／ 500
+   LAYOUT パソコン：表紙は文とMacBookを左右、手順は説明と図を左右。せまい画面ではたてに1列 */
+:root{
+  --bg:#ffffff;--ink:#1d2622;--muted:#55605a;--line:#d9e3de;
+  --green:#2f6f5e;--green-soft:#e6f1ec;--yellow:#ffd54a;--yellow-soft:#fff6d6;--red:#e8553a;--red-soft:#fde8e3;
+  --on-green:#ffffff;--gh-bg:#ffffff;--gh-line:#d0d7de;--gh-ink:#1f2328;--gh-muted:#59636e;--gh-btn:#f6f8fa;--gh-green:#1f883d;--gh-purple:#8250df;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a17;--ink:#eef3f0;--muted:#a9b6b0;--line:#2c3a34;
+    --green:#4fae92;--green-soft:#1c2c26;--yellow:#ffd54a;--yellow-soft:#2e2a17;--red:#ff7a5f;--red-soft:#34201b;
+    --on-green:#0d1714;--gh-bg:#0d1117;--gh-line:#3d444d;--gh-ink:#f0f6fc;--gh-muted:#9198a1;--gh-btn:#212830;--gh-green:#238636;--gh-purple:#a371f7;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a17;--ink:#eef3f0;--muted:#a9b6b0;--line:#2c3a34;
+  --green:#4fae92;--green-soft:#1c2c26;--yellow:#ffd54a;--yellow-soft:#2e2a17;--red:#ff7a5f;--red-soft:#34201b;
+  --on-green:#0d1714;--gh-bg:#0d1117;--gh-line:#3d444d;--gh-ink:#f0f6fc;--gh-muted:#9198a1;--gh-btn:#212830;--gh-green:#238636;--gh-purple:#a371f7;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;min-width:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+  font-weight:500;font-size:17px;line-height:2;overflow-x:clip;-webkit-text-size-adjust:100%;
+}
+rt{font-size:.5em;font-weight:500;color:var(--muted)}
+a{color:var(--green);font-weight:700}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
+
+/* 表紙 */
+.hero{background:var(--green);color:var(--on-green);margin-top:calc(-1*env(safe-area-inset-top,0px));padding-top:calc(env(safe-area-inset-top,0px) + 40px);padding-bottom:44px}
+.hero rt{color:inherit;opacity:.85}
+.hero-tag{display:inline-block;background:var(--yellow);color:#3b2e00;border-radius:999px;padding:0 14px;font-weight:900;font-size:.95rem}
+h1{font-size:clamp(2rem,5.6vw,3.2rem);line-height:1.3;font-weight:900;margin:12px 0 12px;letter-spacing:-.01em}
+.hero p.lead{font-size:1.1rem;margin:0 0 26px;max-width:36em}
+.trip{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;counter-reset:t}
+.trip li{position:relative;background:var(--bg);color:var(--ink);border-radius:20px;padding:14px 14px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.6}
+.trip li:not(:last-child)::after{content:"";position:absolute;right:-13px;top:50%;width:12px;height:12px;border-top:4px solid var(--yellow);border-right:4px solid var(--yellow);transform:translateY(-50%) rotate(45deg);z-index:2}
+.trip svg{width:100%;max-width:150px;height:auto;display:block}
+.trip b{font-weight:900;font-size:1.08rem;margin-top:6px}
+.trip span{font-size:.9rem;color:var(--muted)}
+.trip .st{position:absolute;left:10px;top:10px;width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-weight:900;font-size:.95rem;line-height:1}
+
+/* もくじ */
+.toc{background:var(--yellow-soft);border-bottom:1px solid var(--line)}
+.toc .wrap{padding-top:18px;padding-bottom:18px}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.toc a{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:8px 12px;line-height:1.4;font-size:.95rem;min-height:52px}
+.toc a:hover{border-color:var(--green)}
+.toc .s{flex:none;width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#3b2e00;display:grid;place-items:center;font-weight:900;font-size:.9rem}
+
+section.step{padding-top:54px;padding-bottom:22px;border-bottom:2px dashed var(--line)}
+.step-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.sticker{flex:none;width:58px;height:58px;border-radius:50%;background:var(--yellow);color:#3b2e00;display:grid;place-items:center;font-weight:900;font-size:1.6rem;box-shadow:0 3px 0 #e0b52a;transform:rotate(-6deg)}
+h2{font-size:clamp(1.5rem,4.2vw,2.05rem);line-height:1.35;margin:0;font-weight:900}
+.intro{font-size:1.08rem;margin:4px 0 22px;max-width:44em}
+h3{font-size:1.2rem;margin:0 0 10px;font-weight:900;line-height:1.5}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,400px);gap:36px;align-items:start;margin-bottom:26px}
+.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:grid;gap:12px}
+.steps>li{counter-increment:s;display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;line-height:1.85}
+.steps>li::before{content:counter(s);width:32px;height:32px;border-radius:10px;background:var(--green);color:var(--on-green);display:grid;place-items:center;font-weight:900;margin-top:3px}
+.box{border-radius:16px;padding:14px 18px;margin:16px 0}
+.box.tip{background:var(--green-soft)}
+.box.warn{background:var(--red-soft)}
+.box.yel{background:var(--yellow-soft)}
+.box h4{margin:0 0 4px;font-size:1.05rem;font-weight:900}
+.box p{margin:0}
+.box ul{margin:6px 0 0;padding-left:1.3em}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86em;background:var(--green-soft);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
+
+/* GitHubの画面のイメージ（ここをおす） */
+.gh{background:var(--gh-bg);color:var(--gh-ink);border:1px solid var(--gh-line);border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5;overflow:hidden}
+.gh-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gh-line);font-weight:600;flex-wrap:wrap}
+.gh-bar .repo{color:var(--gh-ink)}
+.gh-pill{border:1px solid var(--gh-line);border-radius:999px;padding:0 8px;font-size:12px;color:var(--gh-muted);font-weight:500}
+.gh-tabs{display:flex;gap:2px;padding:0 8px;border-bottom:1px solid var(--gh-line);overflow-x:auto}
+.gh-tab{padding:9px 10px;white-space:nowrap;color:var(--gh-ink);border-bottom:2px solid transparent}
+.gh-tab.on{border-bottom-color:#fd8c73;font-weight:600}
+.gh-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+.gh-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gh-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--gh-line);background:var(--gh-btn);color:var(--gh-ink);border-radius:6px;padding:5px 12px;font-weight:600;white-space:nowrap}
+.gh-btn.g{background:var(--gh-green);border-color:var(--gh-green);color:#fff}
+.gh-btn.p{background:var(--gh-purple);border-color:var(--gh-purple);color:#fff;border-radius:999px}
+.gh-sel{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--gh-line);background:var(--gh-btn);border-radius:6px;padding:4px 10px;font-size:13px;white-space:nowrap}
+.gh-sel::after{content:"▾";color:var(--gh-muted)}
+.gh-muted{color:var(--gh-muted);font-size:13px}
+.gh-side{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.gh-side div{padding:4px 8px;border-radius:6px}
+.gh-side .on{background:var(--gh-btn);font-weight:600;box-shadow:inset 3px 0 0 #fd8c73}
+.gh-live{border:1px solid var(--gh-line);border-radius:6px;padding:8px 10px;background:var(--gh-btn)}
+.gh-danger{border:1px solid #cf222e;border-radius:6px;padding:10px}
+.gh-danger .gh-btn{color:#cf222e}
+.hl{position:relative;outline:3px solid var(--red);outline-offset:2px;border-radius:7px}
+.hl::before{content:attr(data-n);position:absolute;right:-12px;top:-13px;width:24px;height:24px;border-radius:50%;background:var(--red);color:#fff;font:900 13px/24px "Zen Maru Gothic",sans-serif;text-align:center;border:2px solid #fff;z-index:1}
+.fig-cap{font-size:.85rem;color:var(--muted);margin-top:6px;line-height:1.6}
+
+/* ことば */
+.words{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.word{border:2px solid var(--line);border-radius:18px;padding:12px 16px;display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:start}
+.word svg{width:52px;height:52px}
+.word b{display:block;font-weight:900;color:var(--green);line-height:1.6}
+.word p{margin:0;line-height:1.8}
+
+.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.faq .q{border:2px solid var(--line);border-radius:18px;padding:14px 18px}
+.faq h3{display:flex;gap:10px;align-items:flex-start;font-size:1.08rem}
+.faq h3::before{content:"？";flex:none;width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:.95rem;margin-top:2px}
+.faq p{margin:0}
+.addr{display:grid;gap:8px;margin:10px 0}
+.addr div{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:10px;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px}
+.addr b{font-weight:900}
+.promise{background:var(--green);color:var(--on-green);border-radius:24px;padding:24px 26px;margin:40px 0}
+.promise h2{color:var(--on-green)}
+.promise rt{color:inherit;opacity:.8}
+.promise ul{margin:12px 0 0;padding-left:1.3em;font-size:1.08rem;line-height:2.1}
+footer{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px);color:var(--muted);font-size:.9rem}
+
+@media (max-width:820px){
+  .trip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .trip li:nth-child(2)::after{display:none}
+  .toc ol{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pair{grid-template-columns:minmax(0,1fr);gap:18px}
+  .words,.faq{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:420px){
+  body{font-size:16px}
+  .addr div{grid-template-columns:minmax(0,1fr);gap:0}
+}
+/* Mac版の追加 */
+.mac-h1{font-size:clamp(1.9rem,3.4vw,2.8rem)}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:36px;align-items:center;margin-bottom:30px}
+.mac{width:100%;height:auto;display:block}
+.hero .legend{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.hero .legend li{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;line-height:1.7}
+.hero .legend b{color:var(--yellow)}
+.num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--red);color:#fff;font-weight:900;font-size:.95rem;line-height:1;border:2px solid #fff;margin-top:2px}
+.key{display:inline-flex;align-items:center;justify-content:center;gap:3px;min-width:2.1em;height:2.1em;padding:0 .5em;border:1px solid var(--line);border-bottom-width:4px;border-radius:8px;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;font-weight:700;font-size:.9em;line-height:1;white-space:nowrap;vertical-align:middle}
+.plus{margin:0 3px;color:var(--muted);font-weight:900}
+.keys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kk{border:2px solid var(--line);border-radius:16px;padding:10px 14px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
+.kk .combo{white-space:nowrap}
+.kk p{margin:0;line-height:1.6}
+.kk b{font-weight:900}
+.mods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.mod{background:var(--yellow-soft);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:12px;line-height:1.5}
+.mod .key{font-size:1.25em}
+.pad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.pad div{border:2px dashed var(--line);border-radius:16px;padding:10px 14px;line-height:1.6}
+.pad b{display:block;font-weight:900;color:var(--green)}
+.gh-drop{border:2px dashed var(--gh-line);border-radius:8px;padding:22px 12px;text-align:center;color:var(--gh-muted)}
+.gh-drop b{color:var(--gh-ink);display:block;font-size:15px}
+.gh-link{color:#0969da;text-decoration:underline}
+.gh-file{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--gh-line)}
+.gh-code{font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;padding:10px 12px;color:var(--gh-muted);white-space:pre;overflow:hidden}
+.gh-side .cap{font-size:11px;color:var(--gh-muted);padding:8px 8px 2px;font-weight:600}
+@media (min-width:821px){.toc ol{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (max-width:820px){
+  .hero-grid{grid-template-columns:minmax(0,1fr);gap:20px}
+  .keys,.mods,.pad{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="hero-tag">MacBook（パソコン）版・おうちの人といっしょに</span>
+        <h1 class="mac-h1">MacBookで、<br>アプリをネットに<br><ruby>公開<rt>こうかい</rt></ruby>しよう</h1>
+        <p class="lead">MacBookのブラウザで、GitHubを使ってアプリを公開する<ruby>方法<rt>ほうほう</rt></ruby>だよ。まず、Macの画面の4つの場所をおぼえよう。</p>
+        <ul class="legend">
+          <li><span class="num">1</span><span><b>メニューバー</b>　いちばん上の細い帯。「ファイル」「<ruby>編集<rt>へんしゅう</rt></ruby>」などがあるよ。</span></li>
+          <li><span class="num">2</span><span><b>アドレスバー</b>　ブラウザの上の、アドレス（URL）を入れるところ。</span></li>
+          <li><span class="num">3</span><span><b>Dock（ドック）</b>　いちばん下にならぶ、よく使うアプリのアイコン。</span></li>
+          <li><span class="num">4</span><span><b>Finder（ファインダー）</b>　ファイルをさがすアプリ。ダウンロードしたファイルは「ダウンロード」フォルダに入るよ。</span></li>
+        </ul>
+      </div>
+      <svg class="mac" viewBox="0 0 560 380" role="img" aria-label="MacBookの絵。画面のいちばん上のメニューバーに1、ブラウザのアドレスバーに2、下のDockに3、DockのFinderに4の番号">
+        <rect x="58" y="8" width="444" height="300" rx="18" fill="#1d2622"/>
+        <rect x="70" y="20" width="420" height="276" rx="6" fill="#e9efec"/>
+        <rect x="70" y="20" width="420" height="16" rx="6" fill="#f8faf9"/>
+        <rect x="70" y="30" width="420" height="6" fill="#f8faf9"/>
+        <text x="86" y="32" font-size="9" font-weight="700" fill="#1d2622">Safari</text>
+        <text x="122" y="32" font-size="9" fill="#1d2622">ファイル　編集　表示　履歴</text>
+        <rect x="92" y="46" width="376" height="206" rx="8" fill="#ffffff" stroke="#c9d3ce"/>
+        <rect x="92" y="46" width="376" height="28" rx="8" fill="#f1f4f2"/>
+        <rect x="92" y="66" width="376" height="8" fill="#f1f4f2"/>
+        <circle cx="106" cy="60" r="4" fill="#e8553a"/><circle cx="118" cy="60" r="4" fill="#ffd54a"/><circle cx="130" cy="60" r="4" fill="#9cc7b8"/>
+        <rect x="170" y="52" width="230" height="16" rx="8" fill="#ffffff" stroke="#c9d3ce"/>
+        <text x="285" y="63.5" text-anchor="middle" font-size="8.5" fill="#55605a">github.com/tigers11922911-cyber/8303</text>
+        <text x="108" y="94" font-size="10" fill="#55605a">tigers11922911-cyber /</text><text x="212" y="94" font-size="10" font-weight="700" fill="#1d2622">8303</text>
+        <rect x="240" y="85" width="34" height="12" rx="6" fill="none" stroke="#c9d3ce"/><text x="257" y="94" text-anchor="middle" font-size="7.5" fill="#55605a">Public</text>
+        <text x="108" y="114" font-size="9" fill="#1d2622">Code　 Issues　 Pull requests　 Actions　 Settings</text>
+        <path d="M106 119h28" stroke="#fd8c73" stroke-width="2.5"/>
+        <path d="M92 122h376" stroke="#e1e6e3"/>
+        <rect x="108" y="132" width="40" height="14" rx="3" fill="#f1f4f2" stroke="#c9d3ce"/><text x="128" y="142" text-anchor="middle" font-size="8" fill="#1d2622">main ▾</text>
+        <rect x="396" y="132" width="56" height="14" rx="3" fill="#1f883d"/><text x="424" y="142" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">Code ▾</text>
+        <rect x="108" y="154" width="344" height="86" rx="5" fill="none" stroke="#e1e6e3"/>
+        <g font-size="8.5" fill="#1d2622"><text x="120" y="172">📁 apps-script</text><text x="120" y="190">📁 manual</text><text x="120" y="208">📁 narreji</text><text x="120" y="226">📄 index.html</text></g>
+        <g stroke="#eef1ef"><path d="M108 178h344M108 196h344M108 214h344"/></g>
+        <rect x="150" y="262" width="260" height="26" rx="9" fill="#f8faf9" stroke="#d3dcd8"/>
+        <rect x="160" y="266" width="18" height="18" rx="4" fill="#5aa0e6"/><path d="M164 274h4M172 274h2M165 279q4 3 8 0" stroke="#1d2622" stroke-width="1.3" fill="none"/>
+        <rect x="186" y="266" width="18" height="18" rx="4" fill="#4f8fd8"/><circle cx="195" cy="275" r="5.5" fill="none" stroke="#fff" stroke-width="1.6"/>
+        <rect x="212" y="266" width="18" height="18" rx="4" fill="#f5a524"/><rect x="238" y="266" width="18" height="18" rx="4" fill="#2f6f5e"/><path d="M242 271h10M242 275h8M242 279h10" stroke="#fff" stroke-width="1.5"/>
+        <rect x="264" y="266" width="18" height="18" rx="4" fill="#e8553a"/><rect x="290" y="266" width="18" height="18" rx="4" fill="#9cc7b8"/><rect x="316" y="266" width="18" height="18" rx="4" fill="#c7a6f0"/>
+        <rect x="350" y="266" width="18" height="18" rx="4" fill="#d6dad8"/><rect x="376" y="266" width="18" height="18" rx="4" fill="#b6bcb9"/>
+        <path d="M20 312h520l-24 22H44z" fill="#c9d0cd"/><rect x="20" y="306" width="520" height="8" rx="4" fill="#dfe4e2"/><rect x="240" y="306" width="80" height="5" rx="2.5" fill="#b5bdb9"/>
+        <g font-family="Zen Maru Gothic,sans-serif" font-weight="900" font-size="13" fill="#fff" text-anchor="middle">
+          <circle cx="78" cy="14" r="12" fill="#e8553a" stroke="#fff" stroke-width="2.5"/><text x="78" y="18.5">1</text>
+          <circle cx="414" cy="46" r="12" fill="#e8553a" stroke="#fff" stroke-width="2.5"/><text x="414" y="50.5">2</text>
+          <circle cx="424" cy="262" r="12" fill="#e8553a" stroke="#fff" stroke-width="2.5"/><text x="424" y="266.5">3</text>
+          <circle cx="148" cy="262" r="12" fill="#e8553a" stroke="#fff" stroke-width="2.5"/><text x="148" y="266.5">4</text>
+        </g>
+      </svg>
+    </div>
+    <ol class="trip">
+      <li><span class="st">1</span>
+        <svg viewBox="0 0 150 110" aria-hidden="true"><rect x="38" y="10" width="64" height="84" rx="8" fill="#ffffff" stroke="#2f6f5e" stroke-width="4"/><path d="M84 10v20h18" fill="#e6f1ec" stroke="#2f6f5e" stroke-width="4" stroke-linejoin="round"/><path d="M50 46h40M50 58h34M50 70h40" stroke="#9cc7b8" stroke-width="5" stroke-linecap="round"/><text x="70" y="38" text-anchor="middle" font-size="12" font-weight="900" fill="#2f6f5e">HTML</text><circle cx="110" cy="84" r="16" fill="#ffd54a"/><path d="M103 84l5 5 9-10" fill="none" stroke="#3b2e00" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <b>つくる</b><span>アプリのファイル<br>（もうできているよ）</span></li>
+      <li><span class="st">2</span>
+        <svg viewBox="0 0 150 110" aria-hidden="true"><path d="M20 48L75 14l55 34v52H20z" fill="#e6f1ec" stroke="#2f6f5e" stroke-width="4" stroke-linejoin="round"/><rect x="50" y="56" width="50" height="44" rx="4" fill="#ffffff" stroke="#2f6f5e" stroke-width="4"/><path d="M50 70h50M50 84h50" stroke="#9cc7b8" stroke-width="4"/><rect x="62" y="30" width="26" height="14" rx="3" fill="#2f6f5e"/><text x="75" y="41" text-anchor="middle" font-size="10" font-weight="900" fill="#fff">8303</text></svg>
+        <b>GitHubにおく</b><span>ネットの<ruby>倉庫<rt>そうこ</rt></ruby>に<br>しまう</span></li>
+      <li><span class="st">3</span>
+        <svg viewBox="0 0 150 110" aria-hidden="true"><rect x="22" y="14" width="106" height="80" rx="10" fill="#ffffff" stroke="#2f6f5e" stroke-width="4"/><path d="M22 34h106" stroke="#2f6f5e" stroke-width="4"/><circle cx="34" cy="24" r="3.5" fill="#e8553a"/><circle cx="45" cy="24" r="3.5" fill="#ffd54a"/><circle cx="56" cy="24" r="3.5" fill="#9cc7b8"/><circle cx="75" cy="64" r="22" fill="#e6f1ec" stroke="#2f6f5e" stroke-width="4"/><path d="M53 64h44M75 42c-10 12-10 32 0 44M75 42c10 12 10 32 0 44" fill="none" stroke="#2f6f5e" stroke-width="3"/></svg>
+        <b>Pagesで<ruby>公開<rt>こうかい</rt></ruby></b><span>倉庫に「まど」を<br>つける</span></li>
+      <li><span class="st">4</span>
+        <svg viewBox="0 0 150 110" aria-hidden="true"><rect x="16" y="22" width="88" height="58" rx="6" fill="#1d2622"/><rect x="22" y="28" width="76" height="46" rx="3" fill="#ffffff"/><rect x="28" y="34" width="22" height="22" rx="4" fill="#2f6f5e"/><path d="M56 38h34M56 46h28M30 64h60" stroke="#9cc7b8" stroke-width="4" stroke-linecap="round"/><path d="M8 82h104l-6 8H14z" fill="#9aa5a0"/><rect x="104" y="40" width="32" height="58" rx="7" fill="#1d2622"/><rect x="108" y="47" width="24" height="44" rx="3" fill="#ffffff"/><rect x="112" y="52" width="16" height="16" rx="3" fill="#2f6f5e"/></svg>
+        <b>Macでもスマホでも</b><span>アドレスを<br>開くだけ！</span></li>
+    </ol>
+  </div>
+</header>
+
+<nav class="toc" aria-label="もくじ">
+  <div class="wrap">
+    <ol>
+      <li><a href="#kotoba"><span class="s">あ</span>まず知っておくことば</a></li>
+      <li><a href="#keys"><span class="s">⌘</span>Macのキーのきほん</a></li>
+      <li><a href="#junbi"><span class="s">0</span>じゅんび</a></li>
+      <li><a href="#merge"><span class="s">1</span>下書きを<ruby>清書<rt>せいしょ</rt></ruby>にうつす</a></li>
+      <li><a href="#public"><span class="s">2</span>倉庫を「公開」にする</a></li>
+      <li><a href="#pages"><span class="s">3</span>Pagesをオンにする</a></li>
+      <li><a href="#miru"><span class="s">4</span>開いて、Dockに入れる</a></li>
+      <li><a href="#update"><span class="s">5</span>直す・アップロードする</a></li>
+      <li><a href="#modosu"><span class="s">6</span>前の形にもどす</a></li>
+      <li><a href="#komatta"><span class="s">?</span>こまったとき</a></li>
+    </ol>
+  </div>
+</nav>
+
+<main>
+  <section class="step" id="kotoba">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">あ</span><h2>まず知っておくことば</h2></div>
+      <p class="intro">GitHub（ギットハブ）では、むずかしそうな英語が出てくるけど、意味は<ruby>簡単<rt>かんたん</rt></ruby>。学校の「ノート」にたとえると、よく分かるよ。</p>
+      <div class="words">
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><path d="M6 22L26 8l20 14v24H6z" fill="#e6f1ec" stroke="#2f6f5e" stroke-width="3" stroke-linejoin="round"/><rect x="18" y="28" width="16" height="18" fill="#fff" stroke="#2f6f5e" stroke-width="3"/></svg><div><b>GitHub（ギットハブ）</b><p>ネットの上にある、ファイルの<ruby>倉庫<rt>そうこ</rt></ruby>のサービス。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="8" y="10" width="36" height="32" rx="4" fill="#fff" stroke="#2f6f5e" stroke-width="3"/><rect x="14" y="4" width="24" height="10" rx="3" fill="#2f6f5e"/><path d="M14 24h24M14 32h18" stroke="#9cc7b8" stroke-width="3"/></svg><div><b>リポジトリ</b><p>自分の倉庫。今回の倉庫の名前は <code>8303</code>。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="8" y="6" width="36" height="40" rx="4" fill="#fff6d6" stroke="#c9a227" stroke-width="3"/><path d="M15 18h22M15 26h22M15 34h14" stroke="#c9a227" stroke-width="3" stroke-dasharray="4 3"/></svg><div><b>ブランチ</b><p>下書きノート。新しいアプリは、下書きノート <code>claude/jolly-euler-wqi04e</code> に書いてあるよ。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="8" y="6" width="36" height="40" rx="4" fill="#fff" stroke="#2f6f5e" stroke-width="3"/><path d="M15 18h22M15 26h22M15 34h14" stroke="#2f6f5e" stroke-width="3"/></svg><div><b>main（メイン）</b><p><ruby>清書<rt>せいしょ</rt></ruby>ノート。ネットに公開されるのは、このノートの中身。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="20" fill="#fde8e3" stroke="#e8553a" stroke-width="3"/><path d="M18 26h16M28 20l6 6-6 6" fill="none" stroke="#e8553a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>プルリクエスト</b><p>「下書きを清書にうつしてもいい？」という、おねがいの紙。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="20" fill="#efe4ff" stroke="#8250df" stroke-width="3"/><path d="M17 27l6 6 12-13" fill="none" stroke="#8250df" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>マージ</b><p>下書きを、本当に清書ノートにうつすこと。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="10" y="8" width="32" height="36" rx="4" fill="#fff" stroke="#2f6f5e" stroke-width="3"/><rect x="17" y="8" width="18" height="12" fill="#e6f1ec" stroke="#2f6f5e" stroke-width="3"/><rect x="16" y="28" width="20" height="10" rx="2" fill="#9cc7b8"/></svg><div><b>コミット</b><p>ファイルを<ruby>保存<rt>ほぞん</rt></ruby>すること。いつ何を直したか、記録がのこるよ。</p></div></div>
+        <div class="word"><svg viewBox="0 0 52 52" aria-hidden="true"><rect x="6" y="10" width="40" height="32" rx="5" fill="#fff" stroke="#2f6f5e" stroke-width="3"/><circle cx="26" cy="26" r="9" fill="none" stroke="#2f6f5e" stroke-width="3"/><path d="M17 26h18" stroke="#2f6f5e" stroke-width="2"/></svg><div><b>GitHub Pages（ページズ）</b><p>倉庫の中身を、ホームページとして見せてくれる「まど」。<ruby>無料<rt>むりょう</rt></ruby>で使えるよ。</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="keys">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">⌘</span><h2>Macのキーのきほん</h2></div>
+      <p class="intro">Macでは、<b>⌘（コマンド）キーをおしたまま</b>、ほかのキーをおすと、いろいろなことが<ruby>一発<rt>いっぱつ</rt></ruby>でできるよ。このマニュアルでは、<span class="key">⌘</span><span class="plus">＋</span><span class="key">C</span> のように書くね。</p>
+      <div class="mods">
+        <div class="mod"><span class="key">⌘</span><span><b>command（コマンド）</b><br>スペースキーのとなり</span></div>
+        <div class="mod"><span class="key">⌥</span><span><b>option（オプション）</b><br>⌘ のとなり</span></div>
+        <div class="mod"><span class="key">⇧</span><span><b>shift（シフト）</b><br>左右のはしにある</span></div>
+      </div>
+      <div class="keys">
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">A</span></span><p><b>ぜんぶえらぶ</b>（All）</p></div>
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">C</span></span><p><b>コピー</b>（Copy）</p></div>
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">V</span></span><p><b>はりつけ</b></p></div>
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">F</span></span><p><b>文字をさがす</b>（Find）</p></div>
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">Z</span></span><p><b>1つ前にもどす</b>（まちがえたとき）</p></div>
+        <div class="kk"><span class="combo"><span class="key">⌘</span><span class="plus">＋</span><span class="key">R</span></span><p><b>ページを読みこみなおす</b>（Reload）</p></div>
+      </div>
+      <div class="pad">
+        <div><b>クリック</b>トラックパッドを1本の指でおす</div>
+        <div><b>スクロール</b>2本の指で、上下になぞる</div>
+        <div><b>右クリック</b>2本の指で、いっしょにおす</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="junbi">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">0</span><h2>じゅんび</h2></div>
+      <div class="pair">
+        <div>
+          <ol class="steps">
+            <li><span>Dockの<b>Safari</b>（または<b>Chrome</b>）をクリックして開くよ。</span></li>
+            <li><span>アドレスバーに <code>github.com</code> と入れて <span class="key">return</span> をおし、おうちの人のアカウントでログインするよ。</span></li>
+            <li><span>自分の倉庫を開くよ。アドレスバーに、これを入れてね。<br><code>https://github.com/tigers11922911-cyber/8303</code></span></li>
+            <li><span>よく使うので、<span class="key">⌘</span><span class="plus">＋</span><span class="key">D</span> で<b>ブックマーク</b>しておくと<ruby>便利<rt>べんり</rt></ruby>だよ。</span></li>
+          </ol>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="GitHubの倉庫のページのイメージ。上に倉庫の名前、その下にCode、Pull requests、Settingsなどのタブ">
+            <div class="gh-bar"><span class="gh-muted">tigers11922911-cyber /</span><span class="repo">8303</span><span class="gh-pill">Public</span></div>
+            <div class="gh-tabs"><span class="gh-tab on">Code</span><span class="gh-tab">Issues</span><span class="gh-tab">Pull requests</span><span class="gh-tab">Actions</span><span class="gh-tab">Settings</span></div>
+            <div class="gh-body">
+              <div class="gh-row"><span class="gh-sel">main</span><span class="gh-btn">Add file</span><span class="gh-btn g">Code</span></div>
+              <div class="gh-muted">📁 apps-script　📁 manual　📁 narreji　📄 README.md　📄 index.html</div>
+            </div>
+          </div>
+          <p class="fig-cap">倉庫のページのイメージ。本物とは少しちがうところもあるよ。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="merge">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">1</span><h2>下書きを<ruby>清書<rt>せいしょ</rt></ruby>にうつす</h2></div>
+      <p class="intro">新しいアプリは、まだ「下書きノート」にあるよ。プルリクエスト（おねがいの紙）をつくって、マージ（清書にうつす）しよう。</p>
+      <div class="pair">
+        <div>
+          <ol class="steps">
+            <li><span>上のタブの<b>Pull requests</b>（プルリクエスト）をクリック。</span></li>
+            <li><span>右の緑の<b>New pull request</b>をクリック。</span></li>
+            <li><span><b>base:</b> は <code>main</code>（清書）、<b>compare:</b> は <code>claude/jolly-euler-wqi04e</code>（下書き）をえらぶ。</span></li>
+            <li><span><b>Create pull request</b>をクリック。題名はそのままでOK。もう一度 <b>Create pull request</b>。</span></li>
+            <li><span>2本指で下へスクロールして、緑の<b>Merge pull request</b> → <b>Confirm merge</b>をクリック。</span></li>
+            <li><span>むらさき色の<b>Merged</b>が出たら、せいこう！ 🎉</span></li>
+          </ol>
+          <div class="box tip">
+            <h4>近道</h4>
+            <p>倉庫のページに、黄色い帯と<b>Compare &amp; pull request</b>というボタンが出ていたら、それをクリックすると手順3までとばせるよ。</p>
+          </div>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="プルリクエストをつくる画面のイメージ。baseにmain、compareに下書きのブランチ、Create pull requestボタン">
+            <div class="gh-body">
+              <div style="font-weight:600;font-size:16px">Comparing changes</div>
+              <div class="gh-row"><span class="gh-sel hl" data-n="3">base: main</span><span class="gh-muted">←</span><span class="gh-sel">compare: claude/jolly-euler-wqi04e</span></div>
+              <div class="gh-muted" style="color:var(--gh-green)">✓ Able to merge.</div>
+              <div><span class="gh-btn g hl" data-n="4">Create pull request</span></div>
+            </div>
+          </div>
+          <div class="gh" role="img" aria-label="マージする画面のイメージ。Merge pull requestボタンと、成功するとMergedのしるし" style="margin-top:14px">
+            <div class="gh-body">
+              <div class="gh-muted">✓ This branch has no conflicts with the base branch</div>
+              <div><span class="gh-btn g hl" data-n="5">Merge pull request</span></div>
+              <div class="gh-row"><span class="gh-btn p hl" data-n="6">⑂ Merged</span><span class="gh-muted">← これが出たらせいこう</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="public">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">2</span><h2>倉庫を「<ruby>公開<rt>こうかい</rt></ruby>」にする</h2></div>
+      <p class="intro">無料の GitHub Pages は、だれでも見られる「公開（Public）」の倉庫でしか使えないよ。倉庫の名前のとなりを見てみよう。</p>
+      <div class="pair">
+        <div>
+          <p><b>「Public」</b>と書いてあったら、もう公開になっているよ。この手順は<b>とばして</b>、次の3へ進もう。</p>
+          <p><b>「Private」</b>と書いてあったら、次の手順で公開にするよ。</p>
+          <ol class="steps">
+            <li><span>上のタブの<b>Settings</b>（せってい）をクリック。</span></li>
+            <li><span>いちばん下までスクロールして、赤いわくの<b>Danger Zone</b>をさがす。</span></li>
+            <li><span><b>Change visibility</b> → <b>Change to public</b> をクリック。</span></li>
+            <li><span>たしかめの画面が出るので、書いてあるとおりにクリックして（倉庫の名前 <code>tigers11922911-cyber/8303</code> を入力することもあるよ）、公開にする。</span></li>
+          </ol>
+          <div class="box warn">
+            <h4>公開にすると、せかいじゅうの人が中身を見られるよ</h4>
+            <p>だから、倉庫には<b>ひみつのものを入れない</b>。今のアプリのファイルには、ひみつは入っていないので<ruby>大丈夫<rt>だいじょうぶ</rt></ruby>。（APIキーと<ruby>合言葉<rt>あいことば</rt></ruby>は、使う機械の中だけにあるよ）</p>
+          </div>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="SettingsのいちばんしたのDanger Zone。Change visibilityボタン">
+            <div class="gh-body">
+              <div style="font-weight:600;font-size:16px">Danger Zone</div>
+              <div class="gh-danger">
+                <div class="gh-row" style="justify-content:space-between"><div><div style="font-weight:600">Change repository visibility</div><div class="gh-muted">This repository is currently private.</div></div><span class="gh-btn hl" data-n="3">Change visibility</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="pages">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">3</span><h2>Pagesをオンにする</h2></div>
+      <p class="intro">倉庫に「まど」をつけて、ホームページとして見られるようにするよ。<b>さいしょの1回だけ</b>やればOK。</p>
+      <div class="pair">
+        <div>
+          <ol class="steps">
+            <li><span>上のタブの<b>Settings</b>をクリック。</span></li>
+            <li><span>左のメニューの「Code and automation」の中にある<b>Pages</b>をクリック。</span></li>
+            <li><span><b>Source</b>（ソース）を<b>Deploy from a branch</b>にする。</span></li>
+            <li><span><b>Branch</b>（ブランチ）を <code>main</code> に、となりを <code>/ (root)</code> にする。</span></li>
+            <li><span><b>Save</b>（保存）をクリック。</span></li>
+          </ol>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="SettingsのPagesの画面。左のメニューのPages、SourceにDeploy from a branch、Branchにmainとroot、Saveボタン">
+            <div class="gh-body" style="display:grid;grid-template-columns:118px minmax(0,1fr);gap:12px">
+              <div class="gh-side"><div>General</div><div class="cap">Code and automation</div><div>Branches</div><div>Actions</div><div>Webhooks</div><div class="on hl" data-n="2">Pages</div></div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-weight:600;font-size:16px">GitHub Pages</div>
+                <div><div style="font-weight:600">Source</div><span class="gh-sel hl" data-n="3">Deploy from a branch</span></div>
+                <div><div style="font-weight:600">Branch</div><div class="gh-row"><span class="gh-sel hl" data-n="4">main</span><span class="gh-sel">/ (root)</span><span class="gh-btn hl" data-n="5">Save</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="miru">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">4</span><h2>開いて、Dockに入れる</h2></div>
+      <div class="pair">
+        <div>
+          <ol class="steps">
+            <li><span>1〜3分まってから、<span class="key">⌘</span><span class="plus">＋</span><span class="key">R</span> でPagesの画面を読みこみなおすと、<b>Your site is live at …</b>（公開されたよ）と出るよ。</span></li>
+            <li><span><b>Visit site</b>をクリックするか、下のアドレスをアドレスバーに入れよう。</span></li>
+          </ol>
+          <div class="addr">
+            <div><b>ナレジ</b><code>https://tigers11922911-cyber.github.io/8303/narreji/</code></div>
+            <div><b>ナレジの使い方</b><code>https://tigers11922911-cyber.github.io/8303/narreji/manual/</code></div>
+            <div><b>地図アプリ</b><code>https://tigers11922911-cyber.github.io/8303/</code></div>
+          </div>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="公開されたときのお知らせ。Your site is live at と Visit site ボタン">
+            <div class="gh-body">
+              <div class="gh-live"><div style="font-weight:600">Your site is live at</div><div style="overflow-wrap:anywhere">https://tigers11922911-cyber.github.io/8303/</div></div>
+              <div><span class="gh-btn hl" data-n="2">Visit site ↗</span></div>
+            </div>
+          </div>
+          <div class="box tip">
+            <h4>Dockに入れて、アプリみたいに使う</h4>
+            <p><b>Safari</b>：アプリを開いたまま、メニューバーの「ファイル」→「<b>Dockに追加…</b>」→「追加」。Dockにアイコンができるよ。<br><b>Chrome</b>：右上の <span class="key">⋮</span> のメニューから「<b>アプリとしてインストール</b>」や「ショートカットを作成」をえらぶよ。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="update">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">5</span><h2>直す・アップロードする</h2></div>
+      <p class="intro">倉庫のファイルを新しくして<b>コミット（保存）</b>すると、1〜3分でネットのアプリも新しくなるよ。やりかたは2つ。</p>
+      <div class="pair">
+        <div>
+          <h3>A　文字をはりつけて直す</h3>
+          <ol class="steps">
+            <li><span>倉庫で、直したいファイルをクリック（例：<code>narreji</code> → <code>index.html</code>）。</span></li>
+            <li><span>右上の<b>えんぴつ ✏️</b>をクリック。</span></li>
+            <li><span>文字のところを1回クリックしてから、<span class="key">⌘</span><span class="plus">＋</span><span class="key">A</span>（ぜんぶえらぶ）→ <span class="key">delete</span>（消す）→ <span class="key">⌘</span><span class="plus">＋</span><span class="key">V</span>（新しい全文をはりつけ）。</span></li>
+            <li><span><span class="key">⌘</span><span class="plus">＋</span><span class="key">F</span> で <code>existing code</code> をさがす。<b>見つからなければOK</b>。</span></li>
+            <li><span>緑の<b>Commit changes…</b>をクリックし、もう一度<b>Commit changes</b>。</span></li>
+          </ol>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="ファイルを開いた画面のイメージ。えんぴつのボタン、Raw、Historyのボタン">
+            <div class="gh-file"><span style="font-weight:600">8303 / narreji / index.html</span><span class="gh-row"><span class="gh-btn">🕘 History</span></span></div>
+            <div class="gh-file"><span class="gh-muted">Code　Blame</span><span class="gh-row"><span class="gh-btn">Raw</span><span class="gh-btn hl" data-n="2">✏️</span></span></div>
+            <div class="gh-code">&lt;!doctype html&gt;
+&lt;html lang="ja" data-theme="auto"&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8"&gt;
+…</div>
+          </div>
+        </div>
+      </div>
+      <div class="pair">
+        <div>
+          <h3>B　ファイルごとアップロードする</h3>
+          <p>Claude などからもらったファイルは、Finderの「<b>ダウンロード</b>」フォルダに入っているよ。</p>
+          <ol class="steps">
+            <li><span>GitHubで、入れたいフォルダを開く（例：<code>narreji</code>）。</span></li>
+            <li><span><b>Add file</b> → <b>Upload files</b> をクリック。</span></li>
+            <li><span>Finderの「ダウンロード」から、ファイルを<b>GitHubの点線のわくの中へドラッグ</b>する（クリックしたまま動かして、はなす）。</span></li>
+            <li><span>下の緑の<b>Commit changes</b>をクリック。</span></li>
+            <li><span>アップロードしたファイルを開いて、<span class="key">⌘</span><span class="plus">＋</span><span class="key">F</span> で <code>existing code</code> がないか、たしかめる。</span></li>
+          </ol>
+          <div class="box warn">
+            <h4>ファイルの名前に気をつけて</h4>
+            <p>同じ名前（例：<code>index.html</code>）のファイルを入れると、上書きされるよ。Macが「<code>index (1).html</code>」のように名前を変えていたら、Finderでファイルをえらんで <span class="key">return</span> をおし、<code>index.html</code> に直してからアップロードしてね。</p>
+          </div>
+        </div>
+        <div>
+          <div class="gh" role="img" aria-label="Upload filesの画面のイメージ。ファイルをドラッグする点線のわくと、Commit changesボタン">
+            <div class="gh-body">
+              <div class="gh-muted">8303 / narreji /</div>
+              <div class="gh-drop hl" data-n="3"><b>Drag files here to add them to your repository</b>Or <span class="gh-link">choose your files</span></div>
+              <div><span class="gh-btn g hl" data-n="4">Commit changes</span></div>
+            </div>
+          </div>
+          <p class="fig-cap">ドラッグがうまくいかないときは、「choose your files」をクリックして、ファイルをえらんでもいいよ。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="modosu">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">6</span><h2>前の形にもどす</h2></div>
+      <p class="intro">GitHubは、ぜんぶの<ruby>保存<rt>ほぞん</rt></ruby>の記録をのこしているから、こわれても前の形にもどせるよ。</p>
+      <div class="pair">
+        <div>
+          <ol class="steps">
+            <li><span>こわれたファイルを開いて、右上の<b>History</b>（時計のマーク）をクリック。</span></li>
+            <li><span>こわれる前の日時の記録をさがし、右の <b>…</b> → <b>View file</b> をクリック。</span></li>
+            <li><span><b>Raw</b>をクリック。文字だけの画面になったら、<span class="key">⌘</span><span class="plus">＋</span><span class="key">A</span> → <span class="key">⌘</span><span class="plus">＋</span><span class="key">C</span> でぜんぶコピー。</span></li>
+            <li><span>今のファイルにもどって ✏️ → <span class="key">⌘</span><span class="plus">＋</span><span class="key">A</span> → <span class="key">⌘</span><span class="plus">＋</span><span class="key">V</span> → <b>Commit changes</b>。</span></li>
+          </ol>
+        </div>
+        <div>
+          <div class="box tip">
+            <h4>Macにも、おまもりのコピーをとっておこう</h4>
+            <p>ファイルを開いて、<b>Raw</b> のとなりの <b>⤓（Download raw file）</b>をクリックすると、Macの「ダウンロード」フォルダに<ruby>保存<rt>ほぞん</rt></ruby>できるよ。うまく動いているときに、ときどきとっておくと<ruby>安心<rt>あんしん</rt></ruby>。</p>
+          </div>
+          <div class="box yel"><p>むずかしいときは、Claude に「〇〇のファイルを、こわれる前にもどして」とたのんでもいいよ。</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" id="komatta">
+    <div class="wrap">
+      <div class="step-head"><span class="sticker">?</span><h2>こまったとき</h2></div>
+      <div class="faq">
+        <div class="q"><h3>「404」と出て開けない</h3><p>公開したすぐあとは、まだ<ruby>準備中<rt>じゅんびちゅう</rt></ruby>。3分くらいまってね。それでもだめなら、アドレスのまちがい（<code>narreji</code> のつづり、最後の <code>/</code>）と、Pagesの Branch が <code>main</code> になっているかを見よう。</p></div>
+        <div class="q"><h3>直したのに、前のまま</h3><p>1〜3分まってから <span class="key">⌘</span><span class="plus">＋</span><span class="key">R</span>。それでも前のままなら、<b>強い読みこみなおし</b>をしよう。Safariは <span class="key">⌥</span><span class="plus">＋</span><span class="key">⌘</span><span class="plus">＋</span><span class="key">R</span>、Chromeは <span class="key">⇧</span><span class="plus">＋</span><span class="key">⌘</span><span class="plus">＋</span><span class="key">R</span>。</p></div>
+        <div class="q"><h3>Settings が見つからない</h3><p>おうちの人のアカウントでログインしているか見てね。画面が小さいと、タブが「…」の中にかくれていることもあるよ。</p></div>
+        <div class="q"><h3>ファイルがドラッグできない</h3><p>点線のわくの中で指をはなしてね。うまくいかないときは「choose your files」をクリックして、「ダウンロード」からえらぼう。</p></div>
+        <div class="q"><h3>Merge pull request がおせない</h3><p>「conflict（ぶつかり）」と出ていたら、同じところを2か所で直したということ。自分で直さずに、Claude にたのもう。</p></div>
+        <div class="q"><h3>Actions に赤い ✗ が出た</h3><p>公開の作業がうまくいかなかったしるし。少しまってから、もう一度コミットしてみてね。何回もつづくときは、赤い ✗ の画面を Claude に見せて<ruby>相談<rt>そうだん</rt></ruby>しよう。</p></div>
+      </div>
+
+      <div class="promise">
+        <h2>ネットに出すときの4つのやくそく</h2>
+        <ul>
+          <li>APIキー・パスワード・<ruby>合言葉<rt>あいことば</rt></ruby>は、倉庫に入れない。</li>
+          <li>名前・住所・学校・電話番号・顔の写真は、ネットに出さない。</li>
+          <li>わからないボタンは、クリックする前におうちの人に聞く。</li>
+          <li>ほかの人も使うMacでは、終わったらGitHubからログアウトする。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">MacBookでGitHub公開（2026年11月版）　画面の図はイメージです。GitHubやmacOSの見た目が変わっていることもあります。</div>
+</footer>

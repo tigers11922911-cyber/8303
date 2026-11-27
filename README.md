@@ -1,6 +1,6 @@
 # 8303
 
-📖 GitHubでアプリをネットに公開するしかた（小学生向けマニュアル）：`manual/github.html`
+📖 GitHubでアプリをネットに公開するしかた（小学生向けマニュアル）：スマホ版 `manual/github.html`／MacBook版 `manual/github-mac.html`
 
 まーとん8393 — 車中泊・温泉・酒場スポットマップ（`index.html` 単一ファイルのSPA）。
 
