@@ -413,7 +413,10 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
         <select id="s-chunk">
           <option value="180">短め（約180字・読み始めが早い）</option>
           <option value="320">標準（約320字）</option>
-          <option value="500">長め（約500字・おすすめ・無料枠で長く読める）</option>
+          <option value="500">長め（約500字・おすすめ）</option>
+          <option value="800">もっと長め（約800字）</option>
+          <option value="1000">とても長め（約1000字・待ち時間が長め）</option>
+          <option value="1500">いちばん長め（約1500字・待ち時間が長い・回数をいちばん節約）</option>
         </select>
       </label>
       <label class="switch">朗読が終わったら次のカードへ進む<input type="checkbox" id="s-autonext"></label>
@@ -524,6 +527,16 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
       <button class="ibtn ico-only" id="tts-sec-next" type="button" aria-label="次の節" title="次の節"><svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
   </div>
+  <!-- 先にまとめて声を作っておく（Wi-Fi のある所で。あとで回数も通信も使わずに聞ける） -->
+  <div class="tts-pause-box" id="pre-box" hidden>
+    <div class="tts-pause-head"><span>先に声を作っておく</span><span class="tts-pause-val" id="pre-val"></span></div>
+    <div class="tts-sub">
+      <button class="ibtn" id="pre-card" type="button"><span>このカード</span></button>
+      <button class="ibtn" id="pre-list" type="button"><span>表示中の全部</span></button>
+      <button class="ibtn" id="pre-cancel" type="button" hidden>やめる</button>
+    </div>
+    <div class="muted small" id="pre-status" aria-live="polite" style="line-height:1.5">Wi-Fi のある所で作っておくと、あとで聞くときに回数も通信も使いません。</div>
+  </div>
   <!-- 節ごとに録音して保存（Geminiの声をファイルにしてダウンロード） -->
   <div class="tts-pause-box" id="tts-rec-box" hidden>
     <div class="tts-pause-head"><span>録音して保存（Geminiの声）</span><span class="tts-pause-val" id="tts-rec-val"></span></div>
@@ -549,11 +562,14 @@ fieldset.choice input{width:20px;height:20px;margin-top:2px;accent-color:var(--a
   <div class="tts-pause-box">
     <div class="tts-pause-head"><span>1回に読む文字数</span><span class="tts-pause-val" id="tts-chunk-val">約500字</span></div>
     <div class="tts-seg" id="tts-chunk-btns">
-      <button type="button" data-v="180">短め 180</button>
-      <button type="button" data-v="320">標準 320</button>
-      <button type="button" data-v="500">長め 500</button>
+      <button type="button" data-v="180">180</button>
+      <button type="button" data-v="320">320</button>
+      <button type="button" data-v="500">500</button>
+      <button type="button" data-v="800">800</button>
+      <button type="button" data-v="1000">1000</button>
+      <button type="button" data-v="1500">1500</button>
     </div>
-    <div class="muted small" style="line-height:1.5">長めにすると Gemini に頼む回数が減り、無料枠で長い文章を読めます。短めは読み始めが早く、節を細かく選べます。</div>
+    <div class="muted small" style="line-height:1.5">多くすると Gemini に頼む回数が減り、無料枠で長い文章を読めます。そのぶん読み始めるまでの待ち時間が長くなります。少なくすると読み始めが早く、節を細かく選べます。</div>
   </div>
   <div class="tts-pause-box">
     <div class="tts-pause-head"><span>読む速さ</span><span class="tts-pause-val" id="tts-rate-val">1.0倍</span></div>
@@ -651,7 +667,7 @@ const TTS_VOICES=[
   ["Achird","Achird（親しみやすい）"],["Zubenelgenubi","Zubenelgenubi（くだけた）"],
   ["Sadachbia","Sadachbia（生き生き）"],["Sadaltager","Sadaltager（物知り）"]
 ];
-const CHUNK_LENS=[180,320,500];  // 1回に読む文字数（多いほど Gemini に頼む回数が減り、無料枠で長く読める）
+const CHUNK_LENS=[180,320,500,800,1000,1500];  // 1回に読む文字数（多いほど Gemini に頼む回数が減り、無料枠で長く読める）
 const DEFAULT_PREFS={voice:"Kore",model:TTS_MODELS[0].id,style:"",rate:1,paraPause:1,autoNext:true,theme:"auto",dict:[],chunkLen:500,u:0};
 const DEFAULT_OPTS={apiKey:"",syncUrl:"",syncKey:"",ttsPos:{},tab:"study",cat:"",q:"",lq:"",studyMask:false,onlyNew:false,curId:null,lastSync:0,lastCat:""};
 
@@ -1423,6 +1439,7 @@ function renderTtsSections(){
   if(!c||!total){
     box.hidden=true;
     $("tts-rec-box").hidden=true;
+    $("pre-box").hidden=true;
     lastSecSig="";
     syncTtsIdleUI(0,0);
     return;
@@ -1453,6 +1470,9 @@ function renderTtsSections(){
   resetB.disabled=idx<=0;
   $("tts-rec-box").hidden=false;
   $("tts-rec-val").textContent=`全${total}節`;
+  $("pre-box").hidden=false;
+  $("pre-list").querySelector("span").textContent=`表示中の${view.order.length}枚`;
+  if(!pre.busy)refreshPreCount();
   $("tts-rec-one").querySelector("span").textContent=total>1?`第${idx+1}節を保存`:"この節を保存";
   syncTtsIdleUI(idx,total);
 }
@@ -1502,7 +1522,7 @@ const SILENT_URL=URL.createObjectURL(pcmToWavBlob(new Uint8Array(24000),24000));
 
 /* 生成した音声のキャッシュ（同じ文章を何度も生成しない＝無料枠の節約） */
 const memAudio=new Map();
-const AUDIO_DB="narreji-audio",AUDIO_STORE="a",AUDIO_MAX=300;
+const AUDIO_DB="narreji-audio",AUDIO_STORE="a",AUDIO_MAX=600,AUDIO_MAX_BYTES=600*1024*1024;  // 600節・600MBまで
 let audioDbP=null;
 function audioDb(){
   if(!audioDbP){
@@ -1528,13 +1548,23 @@ async function idbPutAudio(k,blob){
   const db=await audioDb();if(!db)return;
   try{
     const tx=db.transaction(AUDIO_STORE,"readwrite"),st=tx.objectStore(AUDIO_STORE);
-    st.put({k,blob,t:now()});
-    const cnt=st.count();
-    cnt.onsuccess=()=>{
-      let extra=cnt.result-AUDIO_MAX;if(extra<=0)return;
-      st.index("t").openCursor().onsuccess=e=>{const cur=e.target.result;if(cur&&extra>0){cur.delete();extra--;cur.continue()}};
+    st.put({k,blob,t:now(),z:blob.size||0});
+    // 新しいものから数えて、600節・600MBを超えた古い声を消す
+    let n=0,bytes=0;
+    st.index("t").openCursor(null,"prev").onsuccess=e=>{
+      const cur=e.target.result;if(!cur)return;
+      const v=cur.value;n++;bytes+=v.z||(v.blob&&v.blob.size)||0;
+      if(n>AUDIO_MAX||bytes>AUDIO_MAX_BYTES)cur.delete();
+      cur.continue();
     };
   }catch(e){}
+}
+async function idbHasAudio(k){
+  const db=await audioDb();if(!db)return false;
+  return new Promise(res=>{
+    try{const q=db.transaction(AUDIO_STORE).objectStore(AUDIO_STORE).count(k);q.onsuccess=()=>res(q.result>0);q.onerror=()=>res(false)}
+    catch(e){res(false)}
+  });
 }
 async function clearAudioCache(){
   memAudio.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}});memAudio.clear();
@@ -1573,7 +1603,7 @@ async function requestGeminiTts(model,text,voice,style,key,signal){
     const rc=new AbortController();
     const onAbort=()=>rc.abort();
     if(signal)signal.addEventListener("abort",onAbort,{once:true});
-    const timer=setTimeout(()=>rc.abort(),TTS_TIMEOUT_MS);
+    const timer=setTimeout(()=>rc.abort(),Math.max(TTS_TIMEOUT_MS,text.length*120));  // 1500字なら3分まで待つ
     try{
       res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
         method:"POST",signal:rc.signal,
@@ -1599,8 +1629,11 @@ async function requestGeminiTts(model,text,voice,style,key,signal){
       const mime=String(part.inlineData.mimeType||"");
       const bytes=base64ToBytes(part.inlineData.data);
       if(/wav|mpeg|mp3|ogg|aac/i.test(mime))return new Blob([bytes],{type:mime});
-      const m=mime.match(/rate=(\d+)/);
-      return pcmToWavBlob(bytes,m?Number(m[1]):24000);
+      const m=mime.match(/rate=(\d+)/),rate=m?Number(m[1]):24000;
+      // 長い文章なのに声がとても短いときは、途中で切れたとみなしてもう一度作る（1回だけ）
+      const sec=bytes.length/2/rate,expect=text.length/6;
+      if(text.length>200&&sec<expect*0.35&&attempt<1){await waitAbortable(800,signal);continue}
+      return pcmToWavBlob(bytes,rate);
     }
     const err=(j&&j.error)||{};
     const msg=String(err.message||"");
@@ -2168,6 +2201,87 @@ $("d-test-btn").onclick=()=>{
 /* =========================================================
    節ごとに録音して保存（Geminiの声を WAV ファイルにしてダウンロード）
    ========================================================= */
+/* =========================================================
+   先にまとめて声を作っておく
+   ========================================================= */
+const pre={busy:false,ctl:null,sig:"",timer:null};
+function voiceKeyText(text){return applyReadingDict(text)}
+/* この節の声が、どれかのモデルで保存されているか */
+async function isSectionCached(text){
+  const p=getTtsPrefs(),t=voiceKeyText(text);
+  for(const m of TTS_MODELS.map(x=>x.id)){
+    const ck=[m,p.voice,p.style,t].join("\u0001");
+    if(memAudio.has(ck)||await idbHasAudio(ck))return true;
+  }
+  return false;
+}
+async function countCached(cards){
+  let done=0,total=0;
+  for(const c of cards){
+    for(const ch of getCardSpeakChunks(c,false)){total++;if(await isSectionCached(ch.text))done++}
+  }
+  return {done,total};
+}
+/* 朗読パネルの「保存済み ○/○節」を更新（少し待ってまとめて数える） */
+function refreshPreCount(){
+  clearTimeout(pre.timer);
+  pre.timer=setTimeout(async()=>{
+    const c=ttsTargetCard();
+    if(!c||pre.busy)return;
+    const sig=[c.id,c.u,getTtsPrefs().chunkLen,getTtsPrefs().voice,getTtsPrefs().style,JSON.stringify(readingDict())].join("|");
+    const {done,total}=await countCached([c]);
+    if(!pre.busy)$("pre-val").textContent=total?`保存済み ${done}/${total}節`:"";
+    pre.sig=sig;
+  },300);
+}
+function setPreBusy(on,msg){
+  pre.busy=on;
+  $("pre-card").disabled=on;$("pre-list").disabled=on;$("pre-cancel").hidden=!on;
+  if(msg!=null)$("pre-status").textContent=msg;
+}
+async function pregenerate(cards,label){
+  if(pre.busy)return;
+  if(!String(state.opts.apiKey||"").trim()){toast("声を作るには、設定でGemini APIキーを入れてください","設定へ",()=>tab("settings"));return}
+  setPreBusy(true,"保存済みの節を数えています…");
+  const jobs=[];
+  for(const c of cards)for(const ch of getCardSpeakChunks(c,false))if(!(await isSectionCached(ch.text)))jobs.push({c,text:ch.text});
+  if(!jobs.length){setPreBusy(false,`${label}の声は、もう全部作ってあります`);refreshPreCount();return}
+  const run=async()=>{
+    const ctl=new AbortController();pre.ctl=ctl;
+    const p=getTtsPrefs();let made=0;
+    try{
+      for(let i=0;i<jobs.length;i++){
+        if(ctl.signal.aborted)break;
+        setPreBusy(true,`声を作っています…（${i+1}/${jobs.length}節）${jobs[i].c.f?"　"+jobs[i].c.f.slice(0,16):""}`);
+        await fetchGeminiTtsUrl(voiceKeyText(jobs[i].text),p.voice,p.style,ctl.signal);
+        made++;
+        $("pre-val").textContent=`作成 ${made}/${jobs.length}節`;
+      }
+      setPreBusy(false,`${label}の声を ${made}節 作って保存しました。これで回数も通信も使わずに聞けます。`);
+    }catch(err){
+      const msg=err&&(err.code==="cancelled"||err.name==="AbortError")?`やめました（${made}節は保存済み）`
+        :err&&err.code==="quota"?`Gemini の回数の上限になったので止めました（${made}節は保存済み）。上限は日本時間の夕方5時ごろに戻ります。もう一度おすと続きから作ります。`
+        :`${(err&&err.message)||"声を作れませんでした"}（${made}節は保存済み）`;
+      setPreBusy(false,msg);
+    }finally{
+      if(pre.ctl===ctl)pre.ctl=null;
+      refreshPreCount();
+    }
+  };
+  if(jobs.length>15){
+    const mins=Math.max(1,Math.round(jobs.reduce((a,j)=>a+j.text.length,0)/350));
+    setPreBusy(false,"");
+    ask(`${label}の、まだ作っていない ${jobs.length}節の声を作ります。\nGemini に ${jobs.length}回 たのみます（声の長さは合わせて約${mins}分）。\n時間がかかるので、Wi-Fi のある所で、アプリを開いたままにしてください。`,"作る",run);
+  }else run();
+}
+$("pre-card").onclick=()=>{const c=ttsTargetCard();if(!c){toast("カードがありません");return}pregenerate([c],"このカード")};
+$("pre-list").onclick=()=>{
+  const cards=view.order.map(byId).filter(Boolean);
+  if(!cards.length){toast("カードがありません");return}
+  pregenerate(cards,`表示中の${cards.length}枚`);
+};
+$("pre-cancel").onclick=()=>{if(pre.ctl)try{pre.ctl.abort()}catch(e){}};
+
 const rec={busy:false,ctl:null};
 function safeName(s){return String(s||"カード").replace(/[\\/:*?"<>|\r\n\t]/g,"_").replace(/\s+/g," ").trim().slice(0,40)||"カード"}
 function downloadBlob(blob,name){
